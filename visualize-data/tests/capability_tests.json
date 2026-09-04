@@ -1,0 +1,21 @@
+{
+  "contract": ["test_contract_and_strict_qa_pass"],
+  "static-input": ["test_help_and_capabilities"],
+  "mask": ["test_whitespace_failure"],
+  "whitespace": ["test_whitespace_failure"],
+  "source-clipping": ["test_source_clipping_fails"],
+  "composite-clipping": ["test_contract_and_strict_qa_pass"],
+  "panel-boundaries": ["test_contract_and_strict_qa_pass"],
+  "labels": ["test_help_and_capabilities"],
+  "geometry": ["test_help_and_capabilities"],
+  "raster-integrity": ["test_raster_crop_rejects_clipped_source"],
+  "print-scale": ["test_contract_and_strict_qa_pass"],
+  "semantic-colors": ["test_contract_and_strict_qa_pass"],
+  "cross-panel-consistency": ["test_contract_and_strict_qa_pass"],
+  "quantitative-disclosure": ["test_contract_and_strict_qa_pass"],
+  "scientific-integrity": ["test_contract_and_strict_qa_pass"],
+  "output-discipline": ["test_contract_and_strict_qa_pass"],
+  "five-problem-review": ["test_contract_and_strict_qa_pass"],
+  "deviations": ["test_contract_and_strict_qa_pass"],
+  "strict-gate": ["test_contract_and_strict_qa_pass", "test_strict_qa_rejects_vacuous_manifest"]
+}
