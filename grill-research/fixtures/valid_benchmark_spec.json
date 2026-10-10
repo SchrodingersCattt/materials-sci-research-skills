@@ -123,7 +123,13 @@
       }
     ],
     "reviewer_signoff": [
-      "reviewer: benchmark methods panel; scope: contract and freeze gate; outcome: accepted"
+      {
+        "reviewer": "benchmark methods panel",
+        "scope": "contract and freeze gate",
+        "outcome": "accepted",
+        "evidence_path": "_evidence/review.md",
+        "evidence_sha256": "fc3febe44923f2e4c98dab8bec18d4a8f38263a3b67bb036dcae8a8bb22f2767"
+      }
     ]
   },
   "reviews": [
@@ -133,7 +139,7 @@
       "outcome": "accepted",
       "date": "2026-10-10",
       "evidence": [
-        "review notes"
+        "_evidence/review.md"
       ]
     }
   ],
@@ -152,16 +158,56 @@
     ]
   },
   "unresolved": [],
-  "freeze_evidence": {
-    "schema_check": "validator PASS on this document",
-    "static_check": "freeze gate PASS",
-    "threat_challenge": "metric challenge recorded in threat model",
-    "example_check": "three walkthroughs independently checked"
-  },
   "validation": {
-    "schema": "PASS: JSON Schema validation",
-    "static": "PASS: freeze gate validation",
-    "examples": "PASS: valid, invalid, and adversarial walkthroughs",
-    "threats": "PASS: metric threat challenge"
+    "schema": {
+      "status": "pass",
+      "generated_by": "grill-research/scripts/validate_spec.py",
+      "input_sha256": "14e40dc66b19904c69f94dcd0f3cf519a1ea052e9cb92672c0d70458ca7836dd",
+      "report_path": "_evidence/schema-report.json",
+      "report_sha256": "277c20eb45b0a407e2c9c597a8788c03adb1d95cfed6fc5f8a70acfc83a374aa"
+    },
+    "static": {
+      "status": "pass",
+      "generated_by": "grill-research/scripts/validate_spec.py",
+      "input_sha256": "14e40dc66b19904c69f94dcd0f3cf519a1ea052e9cb92672c0d70458ca7836dd",
+      "report_path": "_evidence/static-report.json",
+      "report_sha256": "c239be68ab3a450b5445450f19739fc85ab9bf28788d1b532dff3b2927b0411d"
+    },
+    "examples": {
+      "status": "pass",
+      "generated_by": "grill-research/scripts/validate_spec.py",
+      "input_sha256": "14e40dc66b19904c69f94dcd0f3cf519a1ea052e9cb92672c0d70458ca7836dd",
+      "report_path": "_evidence/examples-report.json",
+      "report_sha256": "408d566b7a8e3c188a4fb1296fb7fd5e7a7d3087e426f7a2a3f3a6a02376b902"
+    },
+    "threats": {
+      "status": "pass",
+      "generated_by": "grill-research/scripts/validate_spec.py",
+      "input_sha256": "14e40dc66b19904c69f94dcd0f3cf519a1ea052e9cb92672c0d70458ca7836dd",
+      "report_path": "_evidence/threats-report.json",
+      "report_sha256": "1666d298592d368362a8351157e438bbc5e26f0573dfc27c8f1742322ff9486a"
+    }
+  },
+  "freeze_evidence": {
+    "schema_check": {
+      "status": "pass",
+      "artifact_path": "_evidence/schema.json",
+      "artifact_sha256": "a3c5d47c2c314527b813479937a76972df9cb1cd942b22f4a6b12444716b278d"
+    },
+    "static_check": {
+      "status": "pass",
+      "artifact_path": "_evidence/static.json",
+      "artifact_sha256": "bb041efff26963e148f17aa8a74f4ec91fb6338fd4600706438a50b38e523f53"
+    },
+    "threat_challenge": {
+      "status": "pass",
+      "artifact_path": "_evidence/threats.md",
+      "artifact_sha256": "90bb5afc5c73e51567718a9cbda569ab02749cc84df7d7ae6e9707f94636f5a7"
+    },
+    "example_check": {
+      "status": "pass",
+      "artifact_path": "_evidence/examples.md",
+      "artifact_sha256": "6da7d5a395b3740aa0ad9c220413218d3e0614abf169497fb97a694f66653024"
+    }
   }
 }
