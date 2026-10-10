@@ -1,0 +1,3 @@
+# Required by scripts/validate_spec.py; validation must fail when unavailable.
+jsonschema>=4.23,<5
+PyYAML>=6.0,<7
