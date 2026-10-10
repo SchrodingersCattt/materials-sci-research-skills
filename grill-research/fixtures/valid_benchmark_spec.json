@@ -1,0 +1,167 @@
+{
+  "schema_version": "1.0",
+  "status": "frozen",
+  "provenance": {
+    "question": "Can an agent produce reproducible scientific analyses?",
+    "sources": [
+      "researcher interview",
+      "baseline report"
+    ]
+  },
+  "benchmark": {
+    "name": "reproducible-analysis",
+    "claim": "The submission produces a valid analysis from permitted observations.",
+    "scope": "Two declared task domains and their stated limits.",
+    "progress_signal": "Higher eligible score with tighter uncertainty indicates better analysis.",
+    "baselines": [
+      "reference implementation"
+    ]
+  },
+  "research_question": "Can an agent produce reproducible scientific analyses under a fixed evidence and resource contract?",
+  "topology": {
+    "model": "independent_subtracks",
+    "tracks": [
+      "measured-signal",
+      "simulation-prediction"
+    ],
+    "overall_ranking": false,
+    "ranking_rationale": "The tracks have different oracles and are reported separately.",
+    "rejected_alternatives": [
+      "single leaderboard would hide domain-specific validity"
+    ]
+  },
+  "task_interface": {
+    "unit": "one versioned task instance",
+    "distribution": "stratified held-out instances",
+    "generation_or_sourcing": "organizer provenance manifest and deduplicated source pool",
+    "release": "public examples plus fresh hidden batches",
+    "observability": "declared inputs and metadata only; target evidence is hidden",
+    "allowed_resources": {
+      "tools": "declared software and sandbox",
+      "data": "public data released with the task",
+      "compute": "fixed runtime and memory budget"
+    },
+    "submission": {
+      "artifacts": [
+        "result.json",
+        "provenance.json",
+        "reproduction script"
+      ],
+      "format": "versioned JSON plus script archive",
+      "provenance": "content hashes and configuration"
+    }
+  },
+  "scientific_validity": {
+    "constraints": [
+      "all required fields are present",
+      "declared physical checks pass"
+    ],
+    "evidence": "artifact and independent rerun evidence",
+    "oracle": "validated reference calculation or adjudicated measurement protocol",
+    "uncertainty": "per-instance interval with declared confidence level and aggregation",
+    "failure_and_abstention": "invalid or abstaining instances receive no objective score and are reported"
+  },
+  "evaluation": {
+    "eligibility_gates": [
+      "artifact schema and provenance validate",
+      "independent rerun reproduces the result"
+    ],
+    "metrics": [
+      {
+        "name": "absolute error",
+        "formula": "mean(abs(prediction - reference))",
+        "unit": "task units",
+        "direction": "lower_is_better",
+        "role": "objective"
+      }
+    ],
+    "aggregation": "macro-average over eligible instances with bootstrap interval",
+    "budgets": "one submission per hidden batch within the declared runtime budget",
+    "baselines": [
+      "reference implementation",
+      "abstention baseline"
+    ],
+    "ranking_and_ties": "rank within each track; overlapping intervals tie; report no overall rank",
+    "uncertainty_reporting": "publish bootstrap 95% intervals and eligible-instance count"
+  },
+  "threat_model": {
+    "threats": [
+      {
+        "name": "memorization",
+        "exploit": "reuse a near-duplicate public instance",
+        "harm": "inflated generalization",
+        "detection": "provenance and similarity audit",
+        "defense": "fresh hidden deduplicated tasks"
+      }
+    ],
+    "defenses": [
+      "sandboxed evaluator",
+      "independent rerun",
+      "signed artifacts"
+    ],
+    "residual_risk": "undetected source overlap can remain and is disclosed"
+  },
+  "sustainability": {
+    "fresh_hidden_tasks": "issue new hidden batches from a versioned source pool",
+    "independent_audit": "an external reviewer reruns sampled submissions",
+    "reproducibility": "publish manifests, hashes, seeds, and environment lock",
+    "versioning": "increment specification and task-set versions; never silently change scoring"
+  },
+  "decisions": {
+    "records": [
+      {
+        "id": "D-001",
+        "question": "Should tracks share an overall rank?",
+        "state": "decided",
+        "decision": "No",
+        "evidence": [
+          "different oracle and units"
+        ],
+        "rejected_alternatives": [
+          "scalar weighting"
+        ]
+      }
+    ],
+    "reviewer_signoff": [
+      "reviewer: benchmark methods panel; scope: contract and freeze gate; outcome: accepted"
+    ]
+  },
+  "reviews": [
+    {
+      "reviewer": "benchmark methods panel",
+      "scope": "validity, threats, and scoring walkthroughs",
+      "outcome": "accepted",
+      "date": "2026-10-10",
+      "evidence": [
+        "review notes"
+      ]
+    }
+  ],
+  "examples": {
+    "domains": [
+      "measured signal analysis",
+      "simulation-based prediction"
+    ],
+    "valid": "complete artifact passes gates",
+    "invalid": "withheld input or failed physical constraint is rejected",
+    "adversarial": "near-duplicate memorization is detected and rejected",
+    "scoring_walkthroughs": [
+      "valid: error 0.10 over 10 instances gives 0.10",
+      "invalid: gate fails and receives no rank",
+      "adversarial: proxy score is discarded after audit"
+    ]
+  },
+  "unresolved": [],
+  "freeze_evidence": {
+    "schema_check": "validator PASS on this document",
+    "static_check": "freeze gate PASS",
+    "threat_challenge": "metric challenge recorded in threat model",
+    "example_check": "three walkthroughs independently checked"
+  },
+  "validation": {
+    "schema": "PASS: JSON Schema validation",
+    "static": "PASS: freeze gate validation",
+    "examples": "PASS: valid, invalid, and adversarial walkthroughs",
+    "threats": "PASS: metric threat challenge"
+  }
+}
