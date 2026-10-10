@@ -49,6 +49,8 @@ overfitting. Link to `THREAT_MODEL.md`.
 ## Sustainability and freeze gate
 
 Describe fresh hidden tasks, independent audits, reproducibility, and versioning.
-List pending/disputed/blocked questions explicitly. Freeze only after schema and
-static checks pass, all critical decisions are resolved, reviewers sign off,
-and the valid, invalid, and adversarial scoring walkthroughs pass.
+List pending/disputed/blocked questions explicitly. Freeze only after
+`python grill-research/scripts/validate_spec.py <spec.json>` recomputes the
+schema and static checks, every machine result binds to the specification hash,
+evidence paths exist with matching SHA-256 digests, a reviewer evidence artifact
+is signed off, and the valid, invalid, and adversarial scoring walkthroughs pass.
