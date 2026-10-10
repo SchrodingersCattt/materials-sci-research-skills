@@ -43,7 +43,7 @@ def test_frozen_spec_requires_substantive_review_and_evidence(tmp_path: Path) ->
 
 def test_required_bundle_and_protocol_are_present() -> None:
     for relative in (
-        "SKILL.md", "BENCHMARK_SPEC.md", "BENCHMARK_SPEC.yaml", "DECISIONS.md",
+        "SKILL.md", "templates/BENCHMARK_SPEC.md", "templates/BENCHMARK_SPEC.yaml", "templates/DECISIONS.md",
         "THREAT_MODEL.md", "EXAMPLES.md", "schemas/benchmark-spec.schema.json",
         "references/scientific-validity.md", "references/benchmark-design.md",
         "references/metric-and-ranking-design.md", "references/threat-model.md",
