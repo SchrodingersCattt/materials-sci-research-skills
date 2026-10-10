@@ -1,0 +1,77 @@
+schema_version: "1.0"
+status: draft
+provenance:
+  question: ""
+  sources: []
+benchmark:
+  name: ""
+  claim: ""
+  scope: ""
+  progress_signal: ""
+  baselines: []
+research_question: ""
+topology:
+  model: single_leaderboard
+  tracks: []
+  overall_ranking: null
+  ranking_rationale: ""
+  rejected_alternatives: []
+task_interface:
+  unit: ""
+  distribution: ""
+  generation_or_sourcing: ""
+  release: ""
+  observability: ""
+  allowed_resources:
+    tools: ""
+    data: ""
+    compute: ""
+  submission:
+    artifacts: []
+    format: ""
+    provenance: ""
+scientific_validity:
+  constraints: []
+  evidence: ""
+  oracle: ""
+  uncertainty: ""
+  failure_and_abstention: ""
+evaluation:
+  eligibility_gates: []
+  metrics: []
+  aggregation: ""
+  budgets: ""
+  baselines: []
+  ranking_and_ties: ""
+  uncertainty_reporting: ""
+threat_model:
+  threats: []
+  defenses: []
+  residual_risk: ""
+sustainability:
+  fresh_hidden_tasks: ""
+  independent_audit: ""
+  reproducibility: ""
+  versioning: ""
+decisions:
+  records: []
+  reviewer_signoff: []
+reviews: []
+examples:
+  domains: []
+  valid: ""
+  invalid: ""
+  adversarial: ""
+  scoring_walkthroughs: []
+unresolved: []
+validation:
+  schema: ""
+  static: ""
+  examples: ""
+  threats: ""
+# Required when status becomes frozen:
+# freeze_evidence:
+#   schema_check: ""
+#   static_check: ""
+#   threat_challenge: ""
+#   example_check: ""
