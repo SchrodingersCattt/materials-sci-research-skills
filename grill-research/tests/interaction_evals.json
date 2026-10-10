@@ -1,0 +1,12 @@
+[
+  {"id": "positive-open-question", "prompt": "I have an open materials science question and want an agent benchmark before anyone runs experiments.", "activate": true, "first_action": "ask_one_high_impact_question"},
+  {"id": "positive-leaderboard", "prompt": "Help me decide whether this scientific challenge needs one leaderboard or independent tracks and define acceptance criteria.", "activate": true, "first_action": "compare_topologies"},
+  {"id": "positive-task-contract", "prompt": "Turn this research claim into hidden tasks, an oracle, and a scoring contract before implementation.", "activate": true, "first_action": "scope_claim"},
+  {"id": "negative-scientific-qa", "prompt": "What is the mechanism behind this phase transition?", "activate": false, "first_action": "answer_scientific_question"},
+  {"id": "negative-execution", "prompt": "Run the already frozen benchmark and publish the leaderboard.", "activate": false, "first_action": "execute_separate_forge"},
+  {"id": "ambiguous-score", "prompt": "Our score is bad; can you optimize the submission?", "activate": false, "first_action": "decline_optimization_and_ask_if_design_is_unfrozen"},
+  {"id": "recovery-unsure", "turns": ["Choose a topology.", "Unsure.", "Use independent tracks."], "expected": ["pending", "narrow_question", "supersede_record"]},
+  {"id": "recovery-conflict", "turns": ["Require a hidden oracle.", "Also publish the oracle before submission."], "expected": ["surface_contradiction", "blocked_until_priority"]},
+  {"id": "recovery-pause", "turns": ["Pause this interview.", "Resume."], "expected": ["persist_draft", "resume_highest_impact_blocker"]},
+  {"id": "recovery-no-oracle", "turns": ["There is no reliable ground truth."], "expected": ["mark_blocked", "propose_evidence_protocol", "refuse_freeze"]}
+]
