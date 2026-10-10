@@ -11,7 +11,7 @@ benchmark:
   baselines: []
 research_question: ""
 topology:
-  model: single_leaderboard
+  model: undecided
   tracks: []
   overall_ranking: null
   ranking_rationale: ""
@@ -65,13 +65,33 @@ examples:
   scoring_walkthroughs: []
 unresolved: []
 validation:
-  schema: ""
-  static: ""
-  examples: ""
-  threats: ""
-# Required when status becomes frozen:
+  schema:
+    status: pending
+    generated_by: grill-research/scripts/validate_spec.py
+    input_sha256: null
+    report_path: null
+    report_sha256: null
+  static:
+    status: pending
+    generated_by: grill-research/scripts/validate_spec.py
+    input_sha256: null
+    report_path: null
+    report_sha256: null
+  examples:
+    status: pending
+    generated_by: grill-research/scripts/validate_spec.py
+    input_sha256: null
+    report_path: null
+    report_sha256: null
+  threats:
+    status: pending
+    generated_by: grill-research/scripts/validate_spec.py
+    input_sha256: null
+    report_path: null
+    report_sha256: null
+# Required when status becomes frozen. Every path must exist and match its digest.
 # freeze_evidence:
-#   schema_check: ""
-#   static_check: ""
-#   threat_challenge: ""
-#   example_check: ""
+#   schema_check: {status: pass, artifact_path: _evidence/schema.json, artifact_sha256: <sha256>}
+#   static_check: {status: pass, artifact_path: _evidence/static.json, artifact_sha256: <sha256>}
+#   threat_challenge: {status: pass, artifact_path: _evidence/threats.md, artifact_sha256: <sha256>}
+#   example_check: {status: pass, artifact_path: _evidence/examples.md, artifact_sha256: <sha256>}
