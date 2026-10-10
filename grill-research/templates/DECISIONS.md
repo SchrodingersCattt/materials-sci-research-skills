@@ -14,4 +14,5 @@ an assumption.
 ## Reviewer sign-off
 
 - Reviewer: `<identity>`; scope: `<what was checked>`; outcome: `accepted /
-  changes_requested`; date: `<ISO date>`; evidence: `<link or artifact>`
+  changes_requested`; date: `<ISO date>`; evidence path: `<relative artifact>`;
+  evidence SHA-256: `<64 hex characters>`
