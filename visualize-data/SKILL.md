@@ -47,18 +47,16 @@ VD="python /aisi-nas/guomingyu/personal/agent-skills/visualize-data/scripts/visu
 - Do not report “QA passed” until both strict checks and post-render visual review
    are substantive. Say “automated checks passed; visual acceptance pending” when
    user acceptance or a scientific presentation choice remains unresolved.
-## Visible-text default
+## Figure text and data completeness
 
-- Unless the user explicitly requests visible text in a figure, render no text
-  inside it: no titles, panel letters, legends, axis labels, tick numbers,
-  annotations, units, formulas, or watermarks. Use geometry, color, marks, and
-  line styles; put meanings, units, exact values, and explanations in chat or
-  accompanying data. Invisible accessibility labels and metadata may remain.
-- This default overrides conflicting examples and annotation defaults in the
-  skill's references, templates, and QA documents. When text is explicitly
-  requested, include only the requested text and check it for overlap and clipping.
-- Render → inspect full image/crops → simplify → rerender → strict QA → visual
-  acceptance. Never use PASS to excuse a crowded figure.
+Include the information needed to read the data directly in the figure: axis
+labels, units, tick values, and legends or scale bars when applicable. Ensure
+these match the underlying data and remain legible at the final display size.
+For structural panels, include identification or scale labels when necessary
+to understand the comparison. Do not add explanatory paragraphs, narrative
+annotations, decorative titles, or crowded text by default; communicate those
+explanations in chat or a caption. Respect explicit user requests and inspect
+the exported figure for missing, overlapping, or clipped labels.
 
 ## Core Gates
 
