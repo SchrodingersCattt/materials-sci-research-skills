@@ -11,6 +11,11 @@ judgement is still required.
 
 ## 1. Universal Rules
 
+By default, figures contain no visible text. Apply the text-placement rules
+below only when the user explicitly requests visible text; put explanations,
+units, and exact values in chat or accompanying data otherwise. Invisible
+accessibility labels and metadata may remain.
+
 ### 1.1 Decorations live in whitespace, never on data
 
 Axis keys, legends, scale bars, compass roses, inset labels, equation overlays,
@@ -69,7 +74,7 @@ clearance thresholds to force a crowded panel through QA.
 
 Plot panels are not captions. Explanatory sentences, methods notes, provenance,
 scope limitations, and validation metrics belong in the caption or manifest.
-Default to no more than two short callouts per panel, normally 1–4 words each.
+Use no callouts by default. When explicitly requested, keep them short.
 Multi-line text is reserved for compact symbol definitions, not paragraphs.
 If a scientific limitation is essential, encode it structurally (for example,
 omit unsupported connections and label the axis/legend accurately) rather than
@@ -213,7 +218,8 @@ scales unless that is true.
   ticks or panels.
 - Grouped bars should use separator lines or bracket annotations, not floating
   group text that competes with data.
-- Axis labels must include units when units exist.
+- If axis labels are explicitly requested, include units when units exist;
+  otherwise state units in chat or accompanying data.
 - Markers should usually be at least 5 pt^2 with edge widths at least 0.5 pt.
 - Error bars, confidence intervals, sample sizes, and fit equations must be
   represented consistently across comparable panels.

@@ -35,7 +35,7 @@ script or copy it into the working notes for the task.
 - Scale bars / axis keys / compass keys:
 - Panel letters:
 - Animation labels or frame timing, if any:
-- Panel text budget (default: phase tag + at most two 1–4 word callouts):
+- Panel text budget (default: no visible text; list only explicitly requested text):
 - Explanations moved to caption/manifest:
 
 ## Forbidden Changes

@@ -47,18 +47,18 @@ VD="python /aisi-nas/guomingyu/personal/agent-skills/visualize-data/scripts/visu
 - Do not report “QA passed” until both strict checks and post-render visual review
    are substantive. Say “automated checks passed; visual acceptance pending” when
    user acceptance or a scientific presentation choice remains unresolved.
+## Visible-text default
 
-## Minimal Annotation First
-
-- Use geometry, axes, symbols, and a short legend—not prose inside panels. Move
-   methods, caveats, provenance, metrics, and scope explanations to caption/manifest.
-- Text budget: phase tag plus at most two 1–4 word callouts per panel.
-- Labels must not cross spines, ticks, inset borders, or data. Reserve whitespace;
-   restructure rather than shrinking below 7 pt.
-- Inspect crops of every title, inset, endpoint, legend, and footer. Any collision,
-   clipping, or ambiguous target blocks delivery regardless of automated PASS.
-- Mandatory order: render → inspect full image/crops → simplify → rerender →
-   strict QA → visual acceptance. Never use PASS to excuse a crowded figure.
+- Unless the user explicitly requests visible text in a figure, render no text
+  inside it: no titles, panel letters, legends, axis labels, tick numbers,
+  annotations, units, formulas, or watermarks. Use geometry, color, marks, and
+  line styles; put meanings, units, exact values, and explanations in chat or
+  accompanying data. Invisible accessibility labels and metadata may remain.
+- This default overrides conflicting examples and annotation defaults in the
+  skill's references, templates, and QA documents. When text is explicitly
+  requested, include only the requested text and check it for overlap and clipping.
+- Render → inspect full image/crops → simplify → rerender → strict QA → visual
+  acceptance. Never use PASS to excuse a crowded figure.
 
 ## Core Gates
 
