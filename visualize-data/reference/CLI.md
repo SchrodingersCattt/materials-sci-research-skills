@@ -3,7 +3,7 @@
 Zero-install launcher:
 
 ```bash
-VD="python /aisi-nas/guomingyu/personal/agent-skills/visualize-data/scripts/visualize_data.py"
+VD="python ${SKILL_DIR:-.}/scripts/visualize_data.py"   # SKILL_DIR = this skill's directory
 ```
 
 ## Typical strict workflow

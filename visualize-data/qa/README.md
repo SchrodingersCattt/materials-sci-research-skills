@@ -28,7 +28,7 @@ on final outputs unless the user explicitly requested variants.
 Use the skill CLI rather than copying helper imports into every plot script:
 
 ```bash
-VD="python /aisi-nas/guomingyu/personal/agent-skills/visualize-data/scripts/visualize_data.py"
+VD="python ${SKILL_DIR:-.}/scripts/visualize_data.py"   # SKILL_DIR = this skill's directory
 $VD init manuscript/figures/figureN
 $VD qa run --manifest manuscript/figures/figureN/figure.manifest.json --strict \
     --json-report manuscript/figures/figureN/_qa/report.json

@@ -10,7 +10,7 @@ scientific rendering; this skill's zero-install CLI owns planning, rasterization
 crop/compose operations, QA, review, and delivery gates.
 
 ```bash
-VD="python /aisi-nas/guomingyu/personal/agent-skills/visualize-data/scripts/visualize_data.py"
+VD="python ${SKILL_DIR:-.}/scripts/visualize_data.py"   # SKILL_DIR = this skill's directory
 ```
 
 ## Mandatory Workflow
