@@ -1,0 +1,14 @@
+{"case_id": "synthetic-fixture",
+ "fields": [
+  {"name": "conversion_treated", "value": "87.5 %", "locator": "Results para 1", "condition": "220 degrees C, 14 days"},
+  {"name": "conversion_control", "value": "61.0 %", "locator": "Results para 1"},
+  {"name": "p_value", "value": "0.003", "locator": "Results para 1"},
+  {"name": "sample_size", "value": "24 per arm", "locator": "Results para 1"},
+  {"name": "catalyst_loading", "value": "5.0 wt% Ni on gamma-alumina", "locator": "Results para 1"},
+  {"name": "selectivity_12_propanediol", "value": "42.5 %", "locator": "Results para 1"},
+  {"name": "generalisation", "value": "may not generalise to field conditions", "locator": "Discussion para 1",
+   "kind": "speculative"},
+  {"name": "deactivation_beyond_14_days", "value": "未报告", "locator": "Discussion para 1", "kind": "not_reported"}
+ ],
+ "status": "complete",
+ "uncertainties": ["no deactivation data beyond the 14-day window"]}

@@ -1,0 +1,108 @@
+{
+  "width": 800,
+  "height": 350,
+  "font_family": "DejaVu Sans",
+  "font_size": 16,
+  "legend": {
+    "x": 20,
+    "y": 240,
+    "w": 240,
+    "h": 80
+  },
+  "nodes": [
+    {
+      "id": "sample",
+      "label": "Sample",
+      "x": 20,
+      "y": 70,
+      "w": 180,
+      "h": 60,
+      "evidence": [
+        {
+          "source": "synthetic-source.txt",
+          "locator": "sentence 2"
+        }
+      ]
+    },
+    {
+      "id": "analysis",
+      "label": "Analysis",
+      "x": 310,
+      "y": 70,
+      "w": 180,
+      "h": 60,
+      "evidence": [
+        {
+          "source": "synthetic-source.txt",
+          "locator": "sentence 2"
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "label": "Report",
+      "x": 600,
+      "y": 70,
+      "w": 180,
+      "h": 60,
+      "evidence": [
+        {
+          "source": "synthetic-source.txt",
+          "locator": "sentence 3"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "flow",
+      "source": "sample",
+      "target": "analysis",
+      "kind": "material_flow",
+      "points": [
+        [
+          200,
+          100
+        ],
+        [
+          310,
+          100
+        ]
+      ],
+      "evidence": [
+        {
+          "source": "synthetic-source.txt",
+          "locator": "sentence 2"
+        }
+      ],
+      "label": "sample",
+      "label_x": 255,
+      "label_y": 80
+    },
+    {
+      "id": "data",
+      "source": "analysis",
+      "target": "report",
+      "kind": "data_flow",
+      "points": [
+        [
+          490,
+          100
+        ],
+        [
+          600,
+          100
+        ]
+      ],
+      "evidence": [
+        {
+          "source": "synthetic-source.txt",
+          "locator": "sentence 3"
+        }
+      ],
+      "label": "data",
+      "label_x": 545,
+      "label_y": 80
+    }
+  ]
+}

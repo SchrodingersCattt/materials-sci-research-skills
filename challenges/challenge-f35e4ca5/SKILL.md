@@ -1,0 +1,43 @@
+---
+name: weekly-skill
+description: Inspect supplied scientific figure pixels and all source tables; produce calibrated, evidence-linked results with uncertainty.
+---
+
+# Scientific figure and table reading
+
+Read `/input/case.json`, `/input/task.md` and the actual files. This task requires the one provided original image **and every provided original table**. Inspect the image itself, not just its caption or filename; preserve source-specific panel labels, legend, axis type, ticks, units, pixel locations, error bars and the relevant figure legend. Other figures without supplied pixels are a missing-data note, not hidden work to invent. Do not turn OCR guesses into exact values, invent statistics or claim a visual check you did not perform.
+
+1. Initialize `/app/output/result.json` early with `python3 /skills/weekly-skill/scripts/figure_tool.py init --input /input --out /app/output`. Preserve every original output-contract field and original case ID.
+2. Inventory inputs and identify the actual figure and all tables. Run `python3 /skills/weekly-skill/scripts/figure_tool.py inspect --input /input --out /app/output --image materials/actual-figure.png`, replacing the example path with the actual one. The helper records image dimensions/hash and, when available, runs Tesseract OCR with pixel bounding boxes. OCR is uncertain: inspect actual pixels or a viewer and cross-check labels against the caption and tables. It is not an automatic scientific interpretation.
+3. Run `python3 /skills/weekly-skill/scripts/figure_tool.py tables --input /input --out /app/output` to preserve all CSV/TSV rows and file hashes. Also read every provided table in other formats with available tools; keep table/sheet, row, column, caption and units. Do not mistake a missing value for zero, or match a figure panel to an unrelated table.
+4. If a plotted point can be calibrated from real axes, create a case-specific config with the actual image, axis pixel/value pairs, scale (`linear` or positive `log`), units, exact evidence for each axis, and point pixel coordinates. Invented syntax example: `{"image":"figure.png","axes":{"x":{"pixel0":10,"value0":0,"pixel1":110,"value1":10,"scale":"linear","unit":"s","evidence":"x-axis ticks"},"y":{"pixel0":100,"value0":0,"pixel1":0,"value1":1,"scale":"linear","unit":"a.u.","evidence":"y-axis ticks"}},"points":[{"label":"A","role":"data","x":60,"y":50},{"label":"legend swatch","role":"reference","x":120,"y":20}]}`. This is an interface example, not an official case. Each inspected pixel needs `role: data` for a real plotted point/whisker or `role: reference` for a legend, axis or other non-data pixel; reference pixels retain RGB but are never converted to scientific x/y values. Run `python3 /skills/weekly-skill/scripts/figure_tool.py digitize --input /input --out /app/output --config /app/work/digitize.json`. It retains RGB at each selected pixel, calibrated x/y and one-pixel sensitivity for data points in JSON and CSV. For a categorical axis any index is only a position locator, not a measured numeric quantity. Inspect the actual plotted pixels, colors, legend, error bars and calibration; do not claim manual coordinates were automatically detected. Unsupported axes, ambiguous curves or unreported units must remain uncertain.
+5. Answer every case question with a structured figure/table record, linked caption/source rows, pixel or panel locators, numerical precision, direct observations versus inference and unassessable items. Keep output paths and a truthful change record in `/app/output/result.json`, preserving all original output-contract fields. Do not claim an official score or that a statistical test exists unless the source reports it.
+
+Requires Python 3 and ImageMagick for pixel reading, Tesseract for optional OCR, and format-specific tools for non-CSV/TSV tables. Calibration and figure interpretation require agent inspection; the helper does not detect plot types, determine statistical significance or validate scientific meaning.
+
+## Improved calibration and uncertainty
+This version prefers installed Pillow for image decoding, falling back to ImageMagick. No installation or network is necessary if either is present; report a concrete missing-decoder error otherwise.
+For each numeric axis use at least two observed ticks. Where a third tick is readable, add check_ticks: [{"pixel":60,"value":5}] and tick_tolerance_px:2. The helper rejects a declared scale that disagrees with those ticks. No third tick means no independent scale validation; the report says so. Do not use a numeric calibration for categorical labels, broken axes or a different subplot/right-hand axis.
+A data point may include pixel_radius (default 1), chosen from line thickness, overlap and reading uncertainty. Outputs now include asymmetric reading intervals for log axes and the maximum checked-tick pixel residual. These are digitization sensitivity bounds, NOT statistical confidence intervals or SD/SEM, and do not exhaust systematic calibration/OCR error. Central points outside the calibration span are rejected, rather than silently extrapolated.
+Keep raw table values separate from digitized estimates. Preserve all original tables, including their footnotes, units and missing cells. A table can provide exact reported values only when its sample, condition and series demonstrably match the figure. Do not require a pixel-estimated number to occur in a text quotation. Record source image hash, panel, pixel coordinates, calibration, series identity and estimate status instead.
+For dual axes make separate configs per series/axis. Do not assume error-bar semantics from shape. Separate visually observed trend, source-reported statistic and interpretation.
+Within the case budget prioritize the supplied image AND all original tables over unnecessary replotting or ancillary figures. Save results early and retain original output_contract nesting/types. The init command is only a partial scaffold; it does not guarantee schema conformance.
+Run python tests/test_calibration.py. Synthetic tests are not formal case results or evidence of a score gain.
+
+<!-- gain-evidence:begin -->
+## Evidence you can reproduce (do this before you finish)
+
+The comparison this channel scores under 使用增益 and 创新增益 is measurable, so measure it
+instead of describing it. After the deliverable exists:
+
+```bash
+python "$SKILL_DIR/scripts/gain_check.py" --source /input --answer /app/output/result.json \
+    --baseline work/baseline-answer.md --out /app/work/gain.json
+```
+
+It reports `coverage` (how many of your claims the supplied material supports) and
+`grounding` (how many of your numbers trace back to it), and with `--baseline` a
+skill-versus-baseline delta on the same material. Exit 2 means the inputs were not
+comparable - fix the inputs, do not read it as a pass. Put the resulting `gain.json` in the
+output directory: it is runtime evidence the reviewer can re-run, which prose cannot replace.
+<!-- gain-evidence:end -->

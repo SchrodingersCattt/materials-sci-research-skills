@@ -1,0 +1,5 @@
+`route_svg.py` is an original narrow SVG box-and-orthogonal-route generator from an explicit source/locator-bearing plan. It does not infer scientific meaning, read a paper, validate citation entailment, draw a realistic instrument or automatically certify legibility. `edit_svg.py` is the prior local narrow source-hashed simple SVG text/fill adapter, not a general SVG editor. No upstream illustration code is bundled. Local examples are synthetic and not official contest cases or empirical benchmark results. Real SVG/PNG/PDF generation depends on actual renderer availability and must be reported honestly.
+
+A later local draft adds optional explicitly positioned editable edge labels, with approximate canvas/node/legend collision checks. Geometry tests are conservative; actual rendered text, line crossings, fonts, labels and scientific meaning still require visual/domain review. This revised draft has not been submitted.
+
+Release assembled from locally authored draft. Trace records actual release assembly and synthetic tests, not earlier drafting or a full conversation. No organizer case or official benchmark was run.

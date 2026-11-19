@@ -1,0 +1,21 @@
+{
+  "case_id": "REUSABLE-ITEM-1",
+  "purpose": "interface and regression item, not an organizer case and not an answer",
+  "input": {
+    "case.json": "a case with output_contract fields",
+    "task.md": "the instruction",
+    "material": "a small declared table plus one caption"
+  },
+  "expected": [
+    "the run produces the deliverable paths the contract names",
+    "result.json keeps case_id and every original output_contract field",
+    "the audit reports zero undeclared numbers",
+    "the artifact re-opens and carries the source text"
+  ],
+  "must_reject": [
+    "a number that has no declared source value",
+    "a citation marker with no reference entry",
+    "a renamed text file pretending to be the required container"
+  ],
+  "variant": "complete material"
+}

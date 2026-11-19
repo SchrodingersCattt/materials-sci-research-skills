@@ -1,0 +1,2 @@
+figure_id,path,kind,declared_data_source,sha256,width_px,height_px,used_in
+F-01,figures/f01.svg,vector,"data/table-1.csv",,,"section 3.1"

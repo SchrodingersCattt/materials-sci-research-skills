@@ -1,0 +1,1 @@
+Synthetic example only. A Sample is passed as material to Analysis. Analysis provides data to Report. This is an invented route and not a real experimental apparatus.

@@ -1,0 +1,13 @@
+# Mapping: task requirement → mechanism → evidence
+
+Relates each judgement direction of the evidence-driven-writing topic to the runtime mechanism
+and to the artifact that proves it. No official scoring claim is made here.
+
+| Requirement direction | Mechanism | Evidence |
+|---|---|---|
+| 找得到 — every substantive claim is extracted and tied to a specific passage, not to "having a citation" | `extract` splits the body into claim units with a `p<paragraph>s<sentence>` locator, records the citation markers and the cited reference entries, and scores every supplied passage by content-word overlap (numbers included), keeping the top matches with verbatim excerpts and their own hashes | `ledger.json`: `claims[].locator`, `.citations`, `.citation_numbers`, `.cited_references`, `.evidence[]` (`source`, `passage_id`, `score`, `excerpt`, `excerpt_sha256_16`) |
+| 对得上 — the original must actually carry the sentence, not something weaker or stronger | each claim gets a strength verdict with reasons: `supported`, `claim_stronger_than_source` (causal wording with no causal or design support; consensus wording over a single small study; proof-level wording against a hedged or limited passage; association upgraded to cause), `source_stronger_than_claim`, `weakly_linked`, `no_supplied_evidence` | `ledger.json`: `claims[].judgement.verdict`, `.reasons`, `.passage_flags`, `.strongest_score` |
+| 引用准确性 — reference reality, numbering and metadata consistency | `audit` cross-checks in-text numbers against the reference list: citation without an entry, entry never cited, duplicate DOI, non-ascending or duplicate numbering, entry missing DOI or year. Checks needing an external database are reported as limits | `citation-audit.json`: `findings[]` with `kind`, `locator`, `detail`, `action`; `references_used`, `references_unused` |
+| 说得准 — evidence strength and uncertainty are expressed | `narrow_suggestion` proposes a concrete weaker rewrite for each over-strong claim (causal → associational, proof-level → supportive, absolute → conditioned), and the ledger repeats any limitation or conflict the passage names but the sentence omits | `ledger.json`: `claims[].judgement.suggestion`; `EVIDENCE_LEDGER.md` table |
+| 复得现 — a second person can re-check and re-run it | the ledger is deterministic over the supplied files; `report` writes the ledger, the audit and a human-readable table with source hashes; `verify` re-reads each named file and compares its hash | `EVIDENCE_LEDGER.md`, `reproducibility.json` (`checks[]`, `status`) |
+| Determinism | extraction and scoring are regex/overlap rules with sorted output order; the self-test extracts twice and compares claim ids and the verdict summary | `tests/run_checks.py` "ledger is not reproducible" assertion |

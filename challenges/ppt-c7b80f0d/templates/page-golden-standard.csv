@@ -1,0 +1,3 @@
+page_no,page_type,required_elements,source_locator,layout_or_master,char_cap
+1,title,"title; authors; affiliation","p.1 L1","template title layout",
+2,outline,"3-6 bullets; no new claims","p.1 L5","template content layout",

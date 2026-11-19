@@ -1,0 +1,4 @@
+#!/usr/bin/env python3
+"""Create invented editable SVG and explicit source-hashed edit plan."""
+import hashlib,json,pathlib,sys
+p=pathlib.Path(sys.argv[1]);p.mkdir(parents=True,exist_ok=False);raw=b'<svg xmlns="http://www.w3.org/2000/svg" width="400" height="220" viewBox="0 0 400 220"><rect id="bar" x="100" y="40" width="100" height="100" fill="#006D77"/><text id="label" x="80" y="180" font-size="24">Synthetic old label</text><text id="unchanged" x="80" y="210" font-size="16">Not real data</text></svg>';(p/'source.svg').write_bytes(raw);plan={'source_sha256':hashlib.sha256(raw).hexdigest(),'edits':[{'id':'label','kind':'text','old':'Synthetic old label','new':'Synthetic revised label','workorder_id':'W1','reason':'Synthetic scoped text edit.'},{'id':'bar','kind':'fill','old':'#006D77','new':'#D1495B','workorder_id':'W2','reason':'Synthetic scoped color edit.'}]};(p/'plan.json').write_text(json.dumps(plan,indent=2));print('Created synthetic SVG and plan:',p)

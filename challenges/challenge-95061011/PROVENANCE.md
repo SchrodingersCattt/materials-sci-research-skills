@@ -1,0 +1,1 @@
+Candidate release was assembled from a locally authored draft. The attached trace records actual release assembly and synthetic tests, not earlier drafting or a full conversation. No official case or benchmark was run.
