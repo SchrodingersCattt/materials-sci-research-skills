@@ -11,10 +11,10 @@ judgement is still required.
 
 ## 1. Universal Rules
 
-By default, figures contain no visible text. Apply the text-placement rules
-below only when the user explicitly requests visible text; put explanations,
-units, and exact values in chat or accompanying data otherwise. Invisible
-accessibility labels and metadata may remain.
+Figures must include the axis labels, units, tick values, and legends or scale
+bars needed to read the data. Check against the data and inspect the final image
+for legibility, overlap, and clipping. Avoid explanatory paragraphs and narrative
+annotations by default; move them to chat or a caption. Respect explicit requests.
 
 ### 1.1 Decorations live in whitespace, never on data
 
