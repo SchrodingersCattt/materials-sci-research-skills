@@ -1,0 +1,26 @@
+{
+  "case_id": "REPLACE-WITH-THE-ORIGINAL-CASE-ID",
+  "deliverables": [
+    {
+      "path": "deliverable.docx",
+      "role": "main editable artifact",
+      "source": "case output_contract"
+    }
+  ],
+  "sections": [
+    {
+      "id": "S1",
+      "title": "",
+      "answers": "",
+      "evidence": []
+    }
+  ],
+  "evidence_map": [
+    {
+      "claim_id": "C-001",
+      "quote": "",
+      "locator": ""
+    }
+  ],
+  "uncertainties": []
+}
