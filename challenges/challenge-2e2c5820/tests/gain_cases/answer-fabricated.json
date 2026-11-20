@@ -1,0 +1,4 @@
+{"fields": [
+ {"name": "conversion_treated", "value": "91.4 %", "locator": "Results para 1"},
+ {"name": "conversion_control", "value": "61.0 %", "locator": "Results para 1"}
+]}
