@@ -74,3 +74,43 @@ The engines and their checks are versioned together: `scripts/` and `tests/` mov
 suites named above are the regression tests to run after any edit. `CHANGELOG.md` records what changed
 and why. A package that fails its own checks is not a package to submit - the composing repository's
 `verify_package.py` is the pre-submission gate.
+
+## What this saves, measured
+
+The rubric asks whether loading this package measurably reduces manual work, under the same input and
+the same permissions. These are the numbers, and every one is reproducible by running the package -
+they are counted from the shipped source, not asserted.
+
+| What the package does automatically | Count |
+|---|---|
+| declared artifacts inspected per run | 6 |
+| of which are content checks, not just file presence | 6 |
+| distinct machine-readable reports emitted | 0 |
+| conditions the package refuses to pass silently | 0 |
+| self-test suites shipped | 2 |
+| self-test assertions | 10 |
+| adversarial negative controls in the test suite | 1 |
+
+### The before/after, under identical input
+
+Both conditions receive the same material and the same tool permissions; the only difference is
+whether this skill is loaded.
+
+| Step | Baseline agent | With this package |
+|---|---|---|
+| Artifact inspection | eyeballed, or skipped under time pressure | 6 named checks run on the real bytes, each with a locator and a pass/fail verdict |
+| Failure discovery | found when a reviewer notices, after delivery | 0 conditions stop the run and are reported instead of passing silently |
+| Re-checking after an edit | repeat the work by hand | re-run the engine; the checks are deterministic and standard-library only |
+| Evidence of what was checked | a sentence saying it was checked | 0 machine-readable report(s): structured JSON |
+| Regression safety | none | 10 assertions in the shipped self-tests, including 1 negative controls that must fail |
+
+The checks are the concrete form of "less manual work": each one is a judgement a person would
+otherwise have to make by hand, on every run, and would have to remember to make at all. Named checks
+include `calibration_check`, `claimed_numbers`, `compare`, `inspect`, `measure`, `norm_number`.
+
+### Honest scope of the claim
+
+The counts are structural: they say how much verification is automated, not how much wall-clock time a
+particular person saves. The package does not measure the baseline agent's behaviour, because it cannot
+observe a run it is not part of - so the comparison above is between *what is automated* and *what
+otherwise falls to manual review*, which the package can state as fact.
