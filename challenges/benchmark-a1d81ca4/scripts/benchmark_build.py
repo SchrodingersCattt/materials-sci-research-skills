@@ -28,6 +28,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -51,48 +52,58 @@ def load(path: Path) -> dict:
     return payload
 
 
+def valid_number(value):
+    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 0
+
+
 def validate_case(case: dict, base: Path) -> list:
     problems = []
     for field in REQUIRED_CASE_FIELDS:
         if not case.get(field):
-            problems.append(f"case {case.get('id')!r} is missing '{field}'")
-    if not isinstance(case.get("anchors"), list):
-        return problems
-    if len(case["anchors"]) < 1:
-        problems.append(f"case {case.get('id')!r} declares no scoring anchors")
+            problems.append(f"case {case.get('id')!r} is missing {field}")
+    anchors = case.get('anchors')
+    if not isinstance(anchors, list) or not anchors:
+        return problems + ['anchors must be a nonempty list']
     seen = set()
-    earnable = 0.0
-    penalty_total = 0.0
-    for anchor in case["anchors"]:
+    earnable = 0
+    for anchor in anchors:
+        if not isinstance(anchor, dict):
+            problems.append('anchor must be an object'); continue
         for field in REQUIRED_ANCHOR_FIELDS:
             if field not in anchor:
-                problems.append(f"case {case.get('id')!r} anchor {anchor.get('id')!r} is missing "
-                                f"'{field}'")
-        if anchor.get("id") in seen:
-            problems.append(f"case {case.get('id')!r} repeats anchor id {anchor.get('id')!r}")
-        seen.add(anchor.get("id"))
-        if not isinstance(anchor.get("points"), (int, float)) or anchor.get("points") < 0:
-            problems.append(f"case {case.get('id')!r} anchor {anchor.get('id')!r} has a non-numeric "
-                            "or negative weight")
-        elif anchor.get("kind") == "penalty":
-            penalty_total += anchor["points"]
+                problems.append('anchor missing ' + field)
+        aid = anchor.get('id')
+        if not isinstance(aid, str) or not aid or aid in seen:
+            problems.append('anchor id must be a unique nonempty string')
         else:
-            earnable += anchor["points"]
-        if anchor.get("kind") not in ("required", "bonus", "penalty"):
-            problems.append(f"case {case.get('id')!r} anchor {anchor.get('id')!r} has kind "
-                            f"{anchor.get('kind')!r}; expected required/bonus/penalty")
-    if case.get("max_points") is not None and abs(earnable - case["max_points"]) > 1e-9:
-        problems.append(f"case {case.get('id')!r} earnable anchors sum to {earnable} but max_points "
-                        f"is {case['max_points']}")
-    for material in case.get("material") or []:
-        if isinstance(material, dict) and material.get("path"):
-            candidate = (base / material["path"]).resolve()
-            if not candidate.exists():
-                problems.append(f"case {case.get('id')!r} references missing material "
-                                f"{material['path']}")
-    expected = case.get("expected") or {}
-    if isinstance(expected, dict) and not expected:
-        problems.append(f"case {case.get('id')!r} declares an empty expected-answer contract")
+            seen.add(aid)
+        if not valid_number(anchor.get('points')):
+            problems.append('anchor points must be finite nonnegative numbers')
+        elif anchor.get('kind') != 'penalty':
+            earnable += anchor['points']
+        if anchor.get('kind') not in ('required','bonus','penalty'):
+            problems.append('anchor kind must be required/bonus/penalty')
+        needles = anchor.get('match_any', [anchor.get('text')])
+        if not isinstance(needles, list) or not needles or any(not isinstance(n,str) or not n.strip() for n in needles):
+            problems.append('match_any must contain nonempty strings')
+    maximum = case.get('max_points')
+    if not valid_number(maximum) or maximum <= 0:
+        problems.append('max_points must be a finite positive number')
+    elif abs(earnable - maximum) > 1e-9:
+        problems.append(f'earnable anchors sum to {earnable} but max_points is {maximum}')
+    materials = case.get('material')
+    if not isinstance(materials,list) or not materials:
+        problems.append('material must be a nonempty list')
+    else:
+        for material in materials:
+            if not isinstance(material,dict) or not isinstance(material.get('path'),str) or not material['path'].strip():
+                problems.append('material requires a nonempty file path'); continue
+            if not (base/material['path']).resolve().is_file():
+                problems.append('missing material file: '+material['path'])
+            if not isinstance(material.get('locator'),str) or not material['locator'].strip():
+                problems.append('material requires an explicit locator')
+    if not isinstance(case.get('expected'),dict) or not case['expected']:
+        problems.append('expected must be a nonempty answer-contract object')
     return problems
 
 
@@ -110,8 +121,8 @@ def validate(spec: dict, outdir: Path) -> dict:
     for case in spec.get("cases") or []:
         problems.extend(validate_case(case, base))
     kinds = {case.get("kind") for case in spec.get("cases") or []}
-    if len(kinds) < int(spec.get("min_cases") or 1):
-        problems.append(f"the spec declares {len(kinds)} case kind(s); at least "
+    if len(spec.get("cases") or []) < int(spec.get("min_cases") or 1):
+        problems.append(f"the spec declares {len(spec.get('cases') or [])} case(s); at least "
                         f"{spec.get('min_cases')} are required")
 
     report = {
@@ -148,11 +159,17 @@ def validate(spec: dict, outdir: Path) -> dict:
 
 def score_case(case: dict, answer: dict) -> dict:
     """Score one answer against the declared anchors. Deterministic and inspectable."""
-    text = normalise(json.dumps(answer, ensure_ascii=False))
+    def values(value):
+        if isinstance(value, dict):
+            return [x for v in value.values() for x in values(v)]
+        if isinstance(value, list):
+            return [x for v in value for x in values(v)]
+        return [] if value is None else [normalise(str(value))]
+    texts = values(answer)
     matched, missed = [], []
     for anchor in case.get("anchors") or []:
         needles = anchor.get("match_any") or [anchor.get("text") or ""]
-        found = any(normalise(needle) and normalise(needle) in text for needle in needles)
+        found = any(normalise(needle) and any(normalise(needle) in text for text in texts) for needle in needles)
         record = {"anchor": anchor.get("id"), "points": anchor.get("points"),
                   "kind": anchor.get("kind"), "matched": bool(found),
                   "evidence": (anchor.get("text") or "")[:120]}
@@ -181,6 +198,9 @@ def score_case(case: dict, answer: dict) -> dict:
 def score(spec: dict, answers_path: Path, outdir: Path) -> dict:
     outdir = Path(outdir)
     outdir.mkdir(parents=True, exist_ok=True)
+    validation = validate(spec, outdir / 'validation')
+    if validation['status'] != 'valid':
+        raise ValueError('Refusing to score invalid benchmark: ' + '; '.join(validation['problems']))
     answers = json.loads(Path(answers_path).read_text(encoding="utf-8"))
     by_case = answers.get("answers") if isinstance(answers, dict) else None
     if not isinstance(by_case, dict):
@@ -189,7 +209,7 @@ def score(spec: dict, answers_path: Path, outdir: Path) -> dict:
     for case in spec.get("cases") or []:
         answer = by_case.get(case.get("id"))
         if answer is None:
-            results.append({"case": case.get("id"), "score": 0.0, "normalised": 0.0,
+            results.append({"case": case.get("id"), "score": 0.0, "normalised": 0.0, "max_points": case["max_points"],
                             "missed_required": [anchor.get("id") for anchor in case.get("anchors") or []
                                                 if anchor.get("kind") == "required"],
                             "note": "no answer supplied for this case"})
@@ -205,7 +225,7 @@ def score(spec: dict, answers_path: Path, outdir: Path) -> dict:
         "total": round(total, 4),
         "maximum": maximum,
         "normalised_total": round(total / maximum, 4),
-        "method": "each anchor is matched by normalised substring against the whole answer object; "
+        "method": "each anchor is matched by normalised substring within individual answer VALUES, never JSON keys; "
                   "required anchors that do not match are reported by id; the score is the matched "
                   "weight minus any matched penalty, clipped to the case maximum.",
         "scope_note": "This is a reproducible score for THIS declared rubric. It is not an official "
@@ -233,7 +253,7 @@ def verify(spec_path: Path, outdir: Path) -> dict:
         fresh["case_count"] >= int(spec.get("min_cases") or 1),
         f"cases={fresh['case_count']} kinds={len({c.get('kind') for c in spec.get('cases') or []})}")
     add("deterministic", "a second validation produces the same result",
-        fresh["problem_count"] == len(fresh["problems"]), "same problem list reproduced")
+        fresh == validate(load(spec_path), outdir / "repeat"), "two fresh validation reports compared")
     add("scoring_reproducible", "the declared rule can be recomputed from the set alone",
         all((case.get("anchors") and case.get("max_points") is not None)
             for case in spec.get("cases") or []),

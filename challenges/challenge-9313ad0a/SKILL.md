@@ -114,20 +114,26 @@ and do not deliver a picture whose text you never laid out.
 
 ## The editable source is part of the deliverable
 
-This channel's statement counts **?????? (a layered editable source)** as one of the six
+This channel's statement counts **可编辑源文件 (a layered editable source)** as one of the six
 elements a figure must cover, alongside the export. So each build writes five files, and all five go
 to `/app/output`:
 
-| File | What it is |
-|---|---|
-| `<name>.svg` | the vector export, editable in any vector tool |
-| `<name>.png` | the raster export, inspected for clipping and blank ink |
-| `<name>.pdf` | the print export |
-| `<name>.drawio` | **the layered source**: every element addressable by id with its geometry, opened by draw.io / diagrams.net |
-| `<name>.provenance.csv` | element id to source file and locator, for the ??????? requirement |
+| File | Written by | What it is |
+|---|---|---|
+| `<name>.svg` | `make_mindmap.py` | the vector export, editable in any vector tool |
+| `<name>.png` | `make_mindmap.py` | the raster export, inspected for clipping and blank ink |
+| `<name>.pdf` | `make_mindmap.py` | the print export |
+| `<name>.opml` | `make_mindmap.py` | **the layered source**: OPML 2.0, the outline format every outliner imports, so the map stays editable after the run |
+| `<name>.mm` | `make_mindmap.py` | **the layered source**: FreeMind XML, the format mind-map tools import |
 
-`make_figure.py` writes the `.drawio` and `.provenance.csv` automatically. Do not deliver only the
-PNG: the export alone fails ?????, because the reviewer cannot reopen and move anything.
+`make_mindmap.py` writes all five automatically: the hierarchy is the source's own tree, so a
+reviewer reopens the map and moves a branch without redrawing it. Do not deliver only the PNG - the
+export alone fails 可编辑性, because nothing can be reopened and moved.
+
+When the case also asks for a chart or a node/edge diagram, `make_figure.py` builds that and writes
+the same three exports plus `<name>.drawio` (the mxGraph source: every element addressable by id with
+its geometry, its layer and its declared source) and `<name>.provenance.csv` (element id, element
+class, drawn content, meaning, source file and locator).
 
 ## Numbers are checked automatically, not by hand
 
@@ -135,7 +141,7 @@ PNG: the export alone fails ?????, because the reviewer cannot reopen and move a
 reads every numeric value in the supplied data, and classifies each prose number as a declared value,
 a declared two-value calculation, or undeclared. Undeclared numbers come back in the report's
 `undeclared_numbers` list and make the run exit non-zero - that list is the traceability defect list
-for the rubric's ?????? sub-point, so repair it before finishing. Add `--data <dir>` if the
+for the rubric's 结果可核验性 sub-point, so repair it before finishing. Add `--data <dir>` if the
 supplied data is not under `/input`.
 
 ## Leave an evidence trail

@@ -1,6 +1,7 @@
 ---
 name: academic-literature-search
-description: Use when a literature search must be run over a supplied corpus and reported reproducibly: an inspectable strategy, adjudicable criteria, a reconciling screening record, and a bounded conclusion.
+description: |-
+  Use when a literature search must be run over a supplied corpus and reported reproducibly: an inspectable strategy, adjudicable criteria, a reconciling screening record, and a bounded conclusion.
 ---
 
 ## Two commands, then the work

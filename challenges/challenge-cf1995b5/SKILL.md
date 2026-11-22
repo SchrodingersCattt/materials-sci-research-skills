@@ -1,6 +1,7 @@
 ---
 name: experimental-protocol-design
-description: Use when a research goal must become an executable protocol: testable hypothesis, operationalised variables with units and instruments, ordered steps with controls, parameters with ranges and stated bases, resources, and decision criteria.
+description: |-
+  Use when a research goal must become an executable protocol: testable hypothesis, operationalised variables with units and instruments, ordered steps with controls, parameters with ranges and stated bases, resources, and decision criteria.
 ---
 
 ## Two commands, then the work

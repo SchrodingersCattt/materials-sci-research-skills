@@ -1,6 +1,7 @@
 ---
 name: citation-and-fact-verification
-description: Use when claims must be checked against the sources they cite: supported, partially supported, unsupported or undecidable, with numeric and statistical consistency across abstract, body and tables.
+description: |-
+  Use when claims must be checked against the sources they cite: supported, partially supported, unsupported or undecidable, with numeric and statistical consistency across abstract, body and tables.
 ---
 
 ## Two commands, then the work

@@ -23,9 +23,11 @@ audit semantics or compatibility.
 
 | Evidence | Result |
 |---|---|
-| `tests/run_checks.py` on `examples/synthetic_case.py` (local, Python 3.12) | pass — spec fully mapped, text stream preserved, 23/23 checks pass |
+| `tests/run_checks.py` on `examples/synthetic_case.py` (local, Python 3.12) | pass — spec fully mapped, text stream preserved, 26/26 checks pass |
+| `tests/linkage_checks.py` on `examples/linkage_case.py` (local, Python 3.12) | pass — the defective variant is reported `needs_work` with all four planted defect kinds named by locator; the clean variant is reported `consistent` with no defect and no observation; `--renumber` leaves no caption out of sequence and carries the in-text references with it |
 | same self-test inside `python:3.11-slim` with `--network none` | pass — identical results with no network and no Office suite |
 | non-DOCX template refusal path | exit 2 with `reason` recorded in `apply-report.json` |
+| realistic manuscript (~40 paragraphs, 3 figures, 2 tables, 12 references) through specify → apply → verify | 27/27 checks pass; this input is what exposed the style-import defect fixed in v2 (a mapping target whose style *name* the manuscript reused under another id was skipped, leaving the output with an undefined style) |
 | real render of the adapted fixture (`soffice --convert-to pdf` + `pdftoppm`) | page-1 PNG inspected; template heading, caption and table styling visibly applied; A4 page from the template |
 
 All fixture values are invented for interface testing. No formal case, hidden material or
@@ -33,12 +35,16 @@ official score was used to build or validate this skill.
 
 ## Boundaries
 
-- The skill proves geometry, style application, content preservation and package integrity.
-  It does not prove typographic quality, scientific meaning or any official score.
+- The skill proves geometry, style application, content preservation, package integrity and the
+  caption/cross-reference/reference-list apparatus. It does not prove typographic quality,
+  scientific meaning or any official score.
 - Prose-only or PDF templates have no style definitions to import; the stated rules are
   applied where the format allows and the rest is reported as unchecked.
-- Numbering, cross-reference fields, TOC fields, headers/footers and journal front matter
-  are preserved, not regenerated. A case that requires the template's own numbering or front
-  matter needs an explicit, recorded decision by the agent.
-- Resource budget observed: 8 UTF-8 text files, largest 40 KB, 118 KB total — inside the
+- Caption numbers and the in-text references that point at them are audited and can be renumbered
+  together. TOC fields, header/footer boilerplate and journal front matter are preserved, not
+  regenerated: a case that requires the template's own headers, front matter or a rebuilt table of
+  contents needs an explicit, recorded decision by the agent. The layout conventions the audit
+  cannot judge (which side of the object a caption belongs on, whether a reference list is in
+  citation order) are reported as observations, not as defects.
+- Resource budget observed: 37 UTF-8 text files, largest 83 KB, 254 KB total — inside the
   50-file / 500 KB-per-file / 2 MB-total skill resource limits.

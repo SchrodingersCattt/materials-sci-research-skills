@@ -1,6 +1,7 @@
 ---
 name: experimental-parameter-optimisation
-description: Use when experimental parameters must be recommended with a search strategy: key parameters with units, admissible ranges and the basis for each, response metrics, a convergence criterion, and a cost trade-off including machine time.
+description: |-
+  Use when experimental parameters must be recommended with a search strategy: key parameters with units, admissible ranges and the basis for each, response metrics, a convergence criterion, and a cost trade-off including machine time.
 ---
 
 ## Two commands, then the work

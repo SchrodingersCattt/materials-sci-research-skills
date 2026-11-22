@@ -12,7 +12,9 @@ python "$SKILL_DIR/scripts/run_case.py" finish --md work/deliverable.md   # buil
 ```
 
 `plan` takes no reading of its own and `finish` returns a JSON report whose `failed_checks` names
-exactly what to repair. Everything else in this file explains what to put in the deliverable between
+exactly what to repair. When `finish` finds an adapted DOCX under `work/adapted` it also audits its
+caption numbering, in-text cross-references and reference list (step 7 below) and reports `linkage`
+with `defect_kinds`. Everything else in this file explains what to put in the deliverable between
 those two calls - the budget is for content, not for orchestration. `finish` exits non-zero if any
 stage failed or a placeholder is still in `result.json`; repair and rerun it rather than shipping.
 
@@ -117,7 +119,27 @@ example in this file.
    deliverable and the missing preview is an explicit limitation, never a claimed success.
    Copy the real artifacts into `/app/output` under the names the case requires (for example
    `deliverable.docx`, `adapted.pdf`, the checklist and the verification report).
-7. **Report honestly.** Write `/app/output/result.json` with the original contract fields:
+7. **Audit the captions, the references that point at them, and the reference list.**
+   `python "$SKILL_DIR/scripts/adapt_template.py" linkage --source <manuscript> --output /app/work/adapted/adapted.docx --outdir /app/work/adapted`
+   `linkage-report.json` lists every figure/table/equation caption it found with the label it
+   declares, its position in the caption sequence of its family, which object it sits next to, and
+   every in-text reference with whether it resolves; then the reference list (entry count, label
+   style, order, repeats) and the SEQ/REF/PAGEREF/TOC field codes with any bookmark a REF field
+   points at but that does not exist. `status` is `consistent`, `needs_work` or `not_applicable`;
+   each defect carries a `kind` and a `locator`. Where the template's own convention differs from
+   the defaults here (a figure caption above the figure, a table caption below the table, a
+   reference list in citation order), the report says so under `observations` instead of treating
+   it as a defect - check the template before changing anything.
+8. **Repair what is repairable, together.** When captions are out of sequence, add `--renumber`:
+   it rewrites the caption number and every in-text reference that points at that caption in one
+   pass, so a number cannot be updated in one place and left stale in the other.
+   `--renumber` writes a new file (default `renumbered.docx`, or `--out-file`), lists every change
+   in `renumbered.caption_edits` / `renumbered.cross_reference_edits`, and refuses (status
+   `ambiguous`, no file written) rather than guess when two captions would collide or when a
+   reference points at a caption that never existed. Take the renumbered file as the deliverable,
+   rerun `verify` and `linkage` on it, and report what remains: a reference to a caption that was
+   never in the manuscript cannot be pointed anywhere by renumbering, so it stays listed.
+9. **Report honestly.** Write `/app/output/result.json` with the original contract fields:
    the deliverable path(s), the preserved-fact and style mapping, the change log (what was
    changed, why, what still needs a human), the verification summary with its real
    pass/fail counts, and `status` from the case's own vocabulary. List uncertainties:
@@ -125,7 +147,7 @@ example in this file.
    behaviour that was preserved rather than renumbered, a template part (header/footer
    boilerplate, journal-specific front matter) that was deliberately not copied, and any
    check that could not run. A partial result must name exactly what is missing.
-8. **Re-open your own output** (`result.json` and each artifact) before finishing: paths
+10. **Re-open your own output** (`result.json` and each artifact) before finishing: paths
    resolve, files are non-empty, the DOCX is still openable, and no number or claim in the
    report is absent from `verification.json`.
 
@@ -142,6 +164,14 @@ example in this file.
 - Template conflict with the source (for example the template demands numbering the
   manuscript does not use): keep the source semantics, record the conflict, and ask for a
   human decision in the change log.
+- The caption/cross-reference audit refuses a renumber (`status: ambiguous`, no file written)
+  when two captions would end up with the same number, when a digit span does not address the raw
+  text (a tab or line break inside the label), or when a reference points at a caption that never
+  existed. The refusal is the result: report it, keep the un-renumbered file, and list what the
+  author has to decide rather than renumbering into an inconsistency.
+- A caption paragraph whose style is the caption role but whose text declares no label is listed
+  under `caption_style_paragraphs_without_label` and is not renumbered - it is reported, because
+  inventing a number for it would change the document's meaning.
 
 ## Genuine upstream relationship
 
@@ -162,7 +192,7 @@ verification above, because doc-forge audits the package, not this task's requir
 reads every numeric value in the supplied data, and classifies each prose number as a declared value,
 a declared two-value calculation, or undeclared. Undeclared numbers come back in the report's
 `undeclared_numbers` list and make the run exit non-zero - that list is the traceability defect list
-for the rubric's ?????? sub-point, so repair it before finishing. Add `--data <dir>` if the
+for the rubric's 结果可核验性 sub-point, so repair it before finishing. Add `--data <dir>` if the
 supplied data is not under `/input`.
 
 ## Leave an evidence trail
@@ -263,6 +293,7 @@ sentence as the comparison rather than buried later.
 | `CHANGELOG.md` | versioning and maintenance policy |
 | `templates/` | glossary, reference map, change log, deliverable plan and pointer templates |
 | `tests/cases/` | reusable interface items with structural expectations |
+| `tests/linkage_checks.py` | the true-positive/true-negative control for the caption, cross-reference and reference-list audit |
 
 These are submission materials, not case answers: no organizer case, whiteboard or formal result is
 included anywhere in this bundle.
@@ -274,6 +305,7 @@ python "$SKILL_DIR/scripts/adapt_template.py" inspect /input/manuscript.docx --o
 python "$SKILL_DIR/scripts/adapt_template.py" specify --template /input/template.docx --source /input/manuscript.docx --out /app/work/spec.json
 python "$SKILL_DIR/scripts/adapt_template.py" apply   --source /input/manuscript.docx --template /input/template.docx --spec /app/work/spec.json --outdir /app/work/adapted
 python "$SKILL_DIR/scripts/adapt_template.py" verify  --source /input/manuscript.docx --output /app/work/adapted/adapted.docx --spec /app/work/spec.json --outdir /app/work/adapted
+python "$SKILL_DIR/scripts/adapt_template.py" linkage --source /input/manuscript.docx --output /app/work/adapted/adapted.docx --outdir /app/work/adapted
 ```
 
 Illustrative output for that toy pair: `{"applied": true, "restyled_paragraphs": 10,

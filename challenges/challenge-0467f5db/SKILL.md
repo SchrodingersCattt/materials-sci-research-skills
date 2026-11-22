@@ -1,6 +1,7 @@
 ---
 name: search-coverage-and-omission-analysis
-description: Use when search coverage must be analysed: coverage against the corpus, omissions with their cause, and a statement of what the conclusion therefore cannot claim.
+description: |-
+  Use when search coverage must be analysed: coverage against the corpus, omissions with their cause, and a statement of what the conclusion therefore cannot claim.
 ---
 
 ## Two commands, then the work

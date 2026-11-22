@@ -1,8 +1,9 @@
-# Rubric coverage — 阅读02｜科研图表解析
+# Rubric coverage — reading engine (question-shaped and field-shaped cases)
 
-Channel: `challenge-f35e4ca5`. Total 100 points. The text below quotes the organizer's own
-scoring points for this channel, so the mapping can be checked against the published
-statement rather than against this skill's own claims.
+Total 100 points. The text below quotes the organizer's own scoring points **for each channel this
+engine serves**, so the mapping can be checked against the published statement rather than against
+this skill's own claims. The header used to name a single channel; the engine is shared, so the
+per-channel sections below are the authority.
 
 | Dimension | Points | Sub-points | Mechanism in this skill | Verification |
 |---|---|---|---|---|
@@ -99,6 +100,25 @@ below so the mapping can be checked per channel.
   - 说明、依赖、示例和限制清楚
   - 必要资源可获得、可迁移
   - 明确目标用户、应用场景及可复用的实践经验。
+
+**Published output contract for this channel** (题面 “Skill 运行后的输出要求”): `case_id`/`paper_id`/
+`material_version` echoed from the input; `answers[]` with one entry per question carrying
+`question_id`, `answer`, `conditions`, `status`, `claims` and `unanswered_parts`; `claims[]` entries
+with `claim_id`, `text`, `kind` (`reported`/`inferred`) and `evidence[]`; each evidence carrying
+`paragraph_id` and a verbatim `quote`; `coverage` stating what was read and what was not. Statuses are
+`answered` / `partial` / `insufficient_evidence` / `input_error`, and a question may not be omitted.
+
+| Published sub-point | Mechanism | Verification |
+|---|---|---|
+| 逐题问答、子问题覆盖完整 | `literature_qa.py plan` schedules one entry per question id found in the case | `qa-plan.json` (`scheduled_answers[]`, `question_count`); check `answers.every_question_once` |
+| 事实、数值、单位及条件符合原文 | a `reported` claim's numbers must appear inside its own verbatim quotation; conditions live in `conditions[]` | check `claim.<…>.numbers_in_quote` |
+| 引文可定位且支持对应结论 | every evidence entry carries `paragraph_id` and a quote, the quote must be in the supplied text, and the paragraph id must exist in the case | checks `evidence.<…>.quote_verbatim`, `evidence.<…>.paragraph_id_known` |
+| 区分论文实测与推断 | `kind` is `reported` or `inferred`; an inferred value cannot be filed as reported | check `claim.<…>.kind` |
+| 拒答判断与未完成部分 | `unanswered_parts[]` is always present and every gap carries a reason | checks `answer.<id>.unanswered_parts`, `answer.<id>.gap_declared`, `answer.<id>.gap_reason[…]` |
+| 输入读取失败要有明确反馈 | `input_error` is a published status and is accepted with no claims; a file that fails to load is reported rather than answered | check `answer.<id>.status`; `SKILL.md` failure handling |
+| 保留输入标识 | the input identity is echoed unchanged | checks `identity.case_id`, `identity.paper_id`, `identity.material_version` |
+| 阅读范围可核验 | `coverage.read` non-empty, every `coverage.unread` entry with a reason | checks `coverage.read`, `coverage.unread_reason[…]` |
+| GitHub 公开作品链接附加分 | `GITHUB_URL.txt` at the submission root, verified as packed before the submission is spent | `submit_candidate.py` bundle check |
 
 ### challenge-f730fc37 — 阅读客户端
 

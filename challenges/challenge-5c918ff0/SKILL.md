@@ -1,6 +1,7 @@
 ---
 name: multi-source-search-with-deduplication
-description: Use when several sources must be searched and merged: per-source counts, content-based de-duplication across sources, and a record of which source each record came from.
+description: |-
+  Use when several sources must be searched and merged: per-source counts, content-based de-duplication across sources, and a record of which source each record came from.
 ---
 
 ## Two commands, then the work

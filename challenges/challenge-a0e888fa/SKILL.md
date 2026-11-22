@@ -1,6 +1,7 @@
 ---
 name: research-data-cleaning
-description: Use when a research dataset must be cleaned reproducibly: dictionary-driven column semantics, missing distinguished from zero, outliers flagged by a stated rule, duplicates at row and identity level, and a quality report computed from the same pass as the result.
+description: |-
+  Use when a research dataset must be cleaned reproducibly: dictionary-driven column semantics, missing distinguished from zero, outliers flagged by a stated rule, duplicates at row and identity level, and a quality report computed from the same pass as the result.
 ---
 
 ## Two commands, then the work

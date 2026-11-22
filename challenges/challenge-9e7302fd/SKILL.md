@@ -1,6 +1,7 @@
 ---
 name: methods-and-statistics-review
-description: Use when a study's design and statistical reporting must be reviewed: controls, sample size, tests stated versus tests implied, effect sizes and whether the reported statistics support the stated conclusion.
+description: |-
+  Use when a study's design and statistical reporting must be reviewed: controls, sample size, tests stated versus tests implied, effect sizes and whether the reported statistics support the stated conclusion.
 ---
 
 ## Two commands, then the work

@@ -1,6 +1,7 @@
 ---
 name: multi-step-data-analysis
-description: Use when a raw dataset and a request must become a complete analysis: import, field verification, cleaning, statistics, figure and report as one chain, with per-step provenance so a drifted definition can be traced.
+description: |-
+  Use when a raw dataset and a request must become a complete analysis: import, field verification, cleaning, statistics, figure and report as one chain, with per-step provenance so a drifted definition can be traced.
 ---
 
 ## Two commands, then the work

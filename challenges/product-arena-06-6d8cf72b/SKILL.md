@@ -1,6 +1,7 @@
 ---
 name: structured-paper-notes
-description: Use when a paper must be turned into reusable structured notes: section-aligned extraction, field-level records, key points, and a back-link from every note to its source span.
+description: |-
+  Use when a paper must be turned into reusable structured notes: section-aligned extraction, field-level records, key points, and a back-link from every note to its source span.
 ---
 
 ## Two commands, then the work

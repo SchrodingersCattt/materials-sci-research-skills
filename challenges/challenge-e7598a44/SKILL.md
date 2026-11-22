@@ -1,6 +1,7 @@
 ---
 name: research-question-driven-retrieval
-description: Use when a research question must drive the search: the question decomposed into concepts, each concept mapped to terms and synonyms, and the screening record tied back to the concepts.
+description: |-
+  Use when a research question must drive the search: the question decomposed into concepts, each concept mapped to terms and synonyms, and the screening record tied back to the concepts.
 ---
 
 ## Two commands, then the work

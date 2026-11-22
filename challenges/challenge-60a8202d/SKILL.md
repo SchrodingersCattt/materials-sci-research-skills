@@ -1,6 +1,7 @@
 ---
 name: citation-chasing-and-related-work
-description: Use when related work must be found by citation chasing: every hop recorded with the reference that produced it, and duplicates resolved by content rather than by title.
+description: |-
+  Use when related work must be found by citation chasing: every hop recorded with the reference that produced it, and duplicates resolved by content rather than by title.
 ---
 
 ## Two commands, then the work

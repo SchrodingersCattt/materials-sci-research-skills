@@ -1,6 +1,7 @@
 ---
 name: manuscript-quality-and-structure-review
-description: Use when a manuscript needs a quality and structural review whose findings are locatable and reproducible: section completeness, hierarchy, abstract-body agreement, and whether the conclusion answers the introduction.
+description: |-
+  Use when a manuscript needs a quality and structural review whose findings are locatable and reproducible: section completeness, hierarchy, abstract-body agreement, and whether the conclusion answers the introduction.
 ---
 
 ## Two commands, then the work

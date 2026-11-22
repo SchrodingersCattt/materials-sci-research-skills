@@ -115,20 +115,20 @@ python "$SKILL_DIR/scripts/make_figure.py" verify --prefix /app/output/figure1 -
 
 ## The editable source is part of the deliverable
 
-This channel's statement counts **?????? (a layered editable source)** as one of the six
+This channel's statement counts **可编辑源文件 (a layered editable source)** as one of the six
 elements a figure must cover, alongside the export. So each build writes five files, and all five go
 to `/app/output`:
 
 | File | What it is |
 |---|---|
-| `<name>.svg` | the vector export, editable in any vector tool |
+| `<name>.svg` | the vector export, editable in any vector tool, text kept as text |
 | `<name>.png` | the raster export, inspected for clipping and blank ink |
 | `<name>.pdf` | the print export |
-| `<name>.drawio` | **the layered source**: every element addressable by id with its geometry, opened by draw.io / diagrams.net |
-| `<name>.provenance.csv` | element id to source file and locator, for the ??????? requirement |
+| `<name>.drawio` | **the layered source**: every element addressable by id with its geometry, its layer and its declared source, opened by draw.io / diagrams.net |
+| `<name>.provenance.csv` | element id, element class, drawn content, meaning (an edge's direction and polarity), source file and locator |
 
 `make_figure.py` writes the `.drawio` and `.provenance.csv` automatically. Do not deliver only the
-PNG: the export alone fails ?????, because the reviewer cannot reopen and move anything.
+PNG: the export alone fails 可编辑性, because the reviewer cannot reopen and move anything.
 
 ## Numbers are checked automatically, not by hand
 
@@ -136,8 +136,42 @@ PNG: the export alone fails ?????, because the reviewer cannot reopen and move a
 reads every numeric value in the supplied data, and classifies each prose number as a declared value,
 a declared two-value calculation, or undeclared. Undeclared numbers come back in the report's
 `undeclared_numbers` list and make the run exit non-zero - that list is the traceability defect list
-for the rubric's ?????? sub-point, so repair it before finishing. Add `--data <dir>` if the
+for the rubric's 结果可核验性 sub-point, so repair it before finishing. Add `--data <dir>` if the
 supplied data is not under `/input`.
+
+## The declared semantics are part of the figure, not just the picture
+
+The rubric's correctness points are entity, relation, **direction, hierarchy, relative proportion and
+unit**, and its completeness point names **three element classes plus legend, annotation, units and
+subfigure numbering**. Those are declared in the spec, drawn in the artwork, and checked:
+
+| Spec key (per node) | What it does |
+|---|---|
+| `class` | `entity` / `medium` / `readout` — the three element classes, drawn and recorded per element |
+| `subfigure` | `(a)`-style numbering, drawn at the box corner |
+| `value` + `unit` | a declared magnitude with its unit, drawn inside the box; a value with no unit is refused |
+| `source` + `locator` | the file and locator the element came from, carried into the provenance record |
+
+| Spec key (per edge) | What it does |
+|---|---|
+| `polarity` | `activate` (solid arrow) / `inhibit` (bar) / `translocate` (dashed) / `regulate` |
+| `from` / `to` | the real endpoints, so the draw.io source keeps them wired |
+| `source` + `locator` | where the relation is stated |
+
+Declare `legend` (class colour to meaning) and `relation_key` (polarity to meaning). When the figure
+draws more than one polarity the artwork **must** distinguish them in ink, not only in the caption: an
+inhibition bar and a solid arrow, never two identical arrows with different words. `verify` fails a
+figure whose legend omits a class it uses, whose recorded element is not actually drawn, an edge whose
+endpoints do not resolve, or a declared value with no unit.
+
+## Exports are checked against their target
+
+`verify` reads the numbers back out of the files that were written, rather than assuming them: the
+**ink bounding box** against the declared canvas at 150 dpi (the footer grows with the caption, so the
+nominal size would check nothing), PNG pixel size, SVG text left as text and `viewBox` present,
+smallest drawn text above the legibility floor, and PDF present with a `MediaBox`. Each becomes an
+`export_*` check in the verification report. A figure that covers its target area but cannot be
+printed at the target size is not a completed export.
 
 ## Leave an evidence trail
 

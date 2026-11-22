@@ -1,6 +1,7 @@
 ---
 name: recency-tracking-and-alerts
-description: Use when recent material must be found and tracked: a stated date window, a baseline set to compare against, and new items distinguished from previously seen ones.
+description: |-
+  Use when recent material must be found and tracked: a stated date window, a baseline set to compare against, and new items distinguished from previously seen ones.
 ---
 
 ## Two commands, then the work

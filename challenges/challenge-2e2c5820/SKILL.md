@@ -1,6 +1,7 @@
 ---
 name: protocol-feasibility-assessment
-description: Use when a protocol must be checked against real constraints before it starts: equipment availability, lead times, sample availability, time per step, parameter tolerance, and ethics or safety approval — with nothing assumed satisfied.
+description: |-
+  Use when a protocol must be checked against real constraints before it starts: equipment availability, lead times, sample availability, time per step, parameter tolerance, and ethics or safety approval — with nothing assumed satisfied.
 ---
 
 ## Two commands, then the work

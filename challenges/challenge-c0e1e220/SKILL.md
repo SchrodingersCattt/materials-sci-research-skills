@@ -1,6 +1,7 @@
 ---
 name: statistical-analysis-and-interpretation
-description: Use when a dataset must be analysed and the result interpreted: assumption checks before the test, an effect size and interval with every p-value, multiplicity handling, and a plain statement of what the result does and does not support.
+description: |-
+  Use when a dataset must be analysed and the result interpreted: assumption checks before the test, an effect size and interval with every p-value, multiplicity handling, and a plain statement of what the result does and does not support.
 ---
 
 ## Two commands, then the work

@@ -1,6 +1,7 @@
 ---
 name: latex-authoring-and-build
-description: Use when LaTeX source must be written, repaired and compiled: formulas, tables, citations, template adaptation, compile errors and a reproducible build.
+description: |-
+  Use when LaTeX source must be written, repaired and compiled: formulas, tables, citations, template adaptation, compile errors and a reproducible build.
 ---
 
 ## Two commands, then the work

@@ -1,6 +1,7 @@
 ---
 name: experiment-result-interpretation
-description: Use when experimental readings must be interpreted: trends stated as trends, anomalies with a stated threshold and distance, candidate causes with an elimination record, and re-check steps that name a concrete action.
+description: |-
+  Use when experimental readings must be interpreted: trends stated as trends, anomalies with a stated threshold and distance, candidate causes with an elimination record, and re-check steps that name a concrete action.
 ---
 
 ## Two commands, then the work

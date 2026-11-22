@@ -6,9 +6,9 @@ statement rather than against this skill's own claims.
 
 | Dimension | Points | Sub-points | Mechanism in this skill | Verification |
 |---|---|---|---|---|
-| 实际效果 | 40 | 任务完成度 15 + 结果正确性 15 + 结果完整性 5 + 结果可核验性 5 | the runtime writes the case's declared deliverables into `/app/output` and re-opens them before finishing | `tests/run_checks.py` on the shipped fixture, then the run's own verification report |
-| 使用增益 | 25 | 质量增益 15 + 效率增益 5 + 增益可验证性 5 | the numbered workflow replaces the free-form draft-review cycle with one executable pass plus one audit pass | the reproduction commands in `GAIN.md`, which anyone can rerun on the fixture |
-| 创新增益 | 15 | 新增能力 5 + 方法改进 5 + 创新证据 5 | the mechanism the baseline agent has no equivalent for: declared-source checks and a real editable artifact from the same pass | `INNOVATION.md`, plus the named checks in the audit report |
+| 实际效果 | 40 | 任务完成度 15 + 结果正确性 15 + 结果完整性 5 + 结果可核验性 5 | the runtime writes the case's declared deliverables into `/app/output` and re-opens them before finishing; the apparatus audit (`linkage`) reports each caption, each in-text cross-reference and the reference list item by item | `tests/run_checks.py` on the shipped fixture, then the run's own verification report |
+| 使用增益 | 25 | 质量增益 15 + 效率增益 5 + 增益可验证性 5 | the numbered workflow replaces the free-form draft-review cycle with one executable pass plus one audit pass; the caption/reference audit runs inside `run_case.py finish` so it costs no extra model request | the reproduction commands in `GAIN.md`, which anyone can rerun on the fixture |
+| 创新增益 | 15 | 新增能力 5 + 方法改进 5 + 创新证据 5 | the mechanism the baseline agent has no equivalent for: declared-source checks, a real editable artifact from the same pass, and a linked caption/cross-reference renumber that updates both sides of a number together or refuses | `INNOVATION.md`, plus the named checks in the audit report and the two controls in `tests/linkage_checks.py` |
 | 可靠体验 | 10 | 调用与易用性 3 + 运行稳定性 4 + 异常处理 3 | explicit trigger conditions, budgets and a documented honest-partial path | the failure matrix in `SKILL.md` and `CHECKLIST.md` |
 | 生态贡献 | 10 | 文档完整性 3 + 资源可复用性 4 + 分享推广价值 3 | runnable scripts, templates, a check list and a reusable item set | the file inventory in `ECOSYSTEM.md` |
 
@@ -20,8 +20,17 @@ The organizer grades:
   - 模板要求的检查项与原稿的内容单元是否都被覆盖。
   - 他人能否按提交材料复现“从输入件到成品”的过程并核对每一项。
 
-How this skill answers it: the runtime writes the case's declared deliverables into `/app/output` and re-opens them before finishing.
-How a reviewer verifies it: `tests/run_checks.py` on the shipped fixture, then the run's own verification report.
+How this skill answers it: the runtime writes the case's declared deliverables into `/app/output`
+and re-opens them before finishing. 排得对's own list - heading levels, numbering, captions and
+cross-references, reference entries, headers/footers - is answered item by item: `verify` compares
+the caption inventory, the reference list and the field codes of output against source, and
+`linkage` reports every caption's declared number against its position in the sequence of its
+family, every in-text reference's resolution, the reference list's entry count, label style, order
+and repeats, and any REF field whose bookmark target is missing. What the audit cannot see is
+stated as a limit rather than left unsaid: headers/footers, TOC content and journal front matter
+are preserved from the manuscript, not regenerated.
+How a reviewer verifies it: `tests/run_checks.py` and `tests/linkage_checks.py` on the shipped
+fixtures, then the run's own verification and linkage reports.
 
 ### 使用增益 (25 points)
 
@@ -30,8 +39,12 @@ The organizer grades:
   - 是否减少逐项核对、重复排版、试错导出与人工返工。
   - 是否通过公平对照证明质量或效率改善。
 
-How this skill answers it: the numbered workflow replaces the free-form draft-review cycle with one executable pass plus one audit pass.
-How a reviewer verifies it: the reproduction commands in `GAIN.md`, which anyone can rerun on the fixture.
+How this skill answers it: the numbered workflow replaces the free-form draft-review cycle with one
+executable pass plus one audit pass, and the caption/cross-reference/reference audit runs inside
+`run_case.py finish` rather than as something the agent has to remember to do - so the request that
+would have been spent deciding to look is spent repairing instead.
+How a reviewer verifies it: the reproduction commands in `GAIN.md`, which anyone can rerun on the
+fixture, and the `linkage` block `finish` prints on any adapted document.
 
 ### 创新增益 (15 points)
 
@@ -40,8 +53,13 @@ The organizer grades:
   - 模板解析、样式映射、内容锚定、转换与导出校验的方法是否带来实质改进。
   - 是否证明创新点相对已有方案的边界和价值。
 
-How this skill answers it: the mechanism the baseline agent has no equivalent for: declared-source checks and a real editable artifact from the same pass.
-How a reviewer verifies it: `INNOVATION.md`, plus the named checks in the audit report.
+How this skill answers it: the mechanism the baseline agent has no equivalent for: declared-source
+checks, a real editable artifact from the same pass, and a linked caption/cross-reference renumber -
+the organizer's own example of a capability that is hard to implement stably. The audit decides what
+to fix and the renumber applies caption numbers and the in-text references that point at them in one
+pass, or refuses with a reason when the document does not determine the answer.
+How a reviewer verifies it: `INNOVATION.md`, plus the named checks in the audit report and the two
+controls (defective and clean) in `tests/linkage_checks.py`.
 
 ### 可靠体验 (10 points)
 

@@ -1,6 +1,7 @@
 ---
 name: patent-and-technical-literature-search
-description: Use when patents and technical documents must be searched: the same strategy, screening and coverage record, with claim scope and publication status recorded where available.
+description: |-
+  Use when patents and technical documents must be searched: the same strategy, screening and coverage record, with claim scope and publication status recorded where available.
 ---
 
 ## Two commands, then the work

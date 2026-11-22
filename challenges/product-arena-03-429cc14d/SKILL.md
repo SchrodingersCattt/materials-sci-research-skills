@@ -1,6 +1,7 @@
 ---
 name: citation-and-reference-consistency
-description: Use when a manuscript's citations and reference list must be made consistent: insertion position, renumbering, de-duplication, style conversion and body-to-reference agreement.
+description: |-
+  Use when a manuscript's citations and reference list must be made consistent: insertion position, renumbering, de-duplication, style conversion and body-to-reference agreement.
 ---
 
 ## Two commands, then the work

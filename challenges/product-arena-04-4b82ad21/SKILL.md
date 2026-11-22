@@ -1,6 +1,7 @@
 ---
 name: introduction-and-related-work
-description: Use when an introduction and related-work section must be written from supplied material: background, prior work organisation, the research gap, and honest contribution statements with citation coverage.
+description: |-
+  Use when an introduction and related-work section must be written from supplied material: background, prior work organisation, the research gap, and honest contribution statements with citation coverage.
 ---
 
 ## Two commands, then the work

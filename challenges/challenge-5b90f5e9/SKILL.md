@@ -1,6 +1,7 @@
 ---
 name: systematic-search-and-screening
-description: Use when a systematic search must be executed: an explicit strategy, adjudicable inclusion criteria, two-stage screening, and counts that reconcile at every stage.
+description: |-
+  Use when a systematic search must be executed: an explicit strategy, adjudicable inclusion criteria, two-stage screening, and counts that reconcile at every stage.
 ---
 
 ## Two commands, then the work

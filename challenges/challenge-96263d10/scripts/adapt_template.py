@@ -14,6 +14,8 @@ inspect  PATH                      report a DOCX/template's structure and hashes
 specify --template T --source S    extract the format checklist + style mapping
 apply   --source S --template T    produce the adapted DOCX (text preserved)
 verify  --source S --output O      per-item compliance and content-coverage checks
+linkage --source S --output O      caption numbering, in-text cross-references, reference
+                                   entries and field codes; --renumber repairs them together
 preview --docx D                   optional real PDF/PNG render, or an honest note
 
 Every command writes machine-readable JSON next to its human summary.
@@ -482,6 +484,38 @@ def build_spec(template_info: dict, source_info: dict) -> dict:
     usage = source_info.get("paragraph_style_usage") or {}
     add("source_styles_in_use", "content", "paragraph styles actually used by the manuscript",
         {sid: usage.get(sid, 0) for sid in source_styles}, "source word/document.xml pStyle usage")
+    apparatus_source = analyse_apparatus(Path(source_info.get("path") or "."))
+    source_families = apparatus_source.get("caption_families") or {}
+    add("captions", "apparatus",
+        "figure/table/equation captions the manuscript declares and the objects they label",
+        {"families": source_families,
+         "placement": {record["family"]: record["placement_observed"]
+                       for record in apparatus_source.get("captions") or []},
+         "consistent_numbering": (apparatus_source.get("counts") or {}).get("captions_consistent")},
+        "source word/document.xml caption labels + neighbouring blocks",
+        "extracted" if source_families else "not_found")
+    add("cross_references", "apparatus",
+        "in-text figure/table/equation references and whether each one resolves",
+        {"count": (apparatus_source.get("counts") or {}).get("cross_references"),
+         "dangling": (apparatus_source.get("counts") or {}).get("cross_references_dangling")},
+        "source word/document.xml in-text references",
+        "extracted" if (apparatus_source.get("counts") or {}).get("cross_references") else "not_found")
+    add("reference_list", "apparatus",
+        "the manuscript's reference list: heading, entry count, label style, order and repeats",
+        {key: value for key, value in (apparatus_source.get("reference_list") or {}).items()
+         if key != "entries"},
+        "source word/document.xml reference section",
+        "extracted" if (apparatus_source.get("reference_list") or {}).get("found") else "not_found")
+    apparatus_template = analyse_apparatus(Path(template_info.get("path") or "."))
+    add("template_apparatus", "apparatus",
+        "the template's own caption/reference apparatus, when it ships one",
+        {"caption_families": apparatus_template.get("caption_families") or {},
+         "reference_list": (apparatus_template.get("reference_list") or {}).get("entry_count"),
+         "headers": template_info.get("headers"), "footers": template_info.get("footers")},
+        "template word/document.xml + package part inventory",
+        "extracted" if (apparatus_template.get("caption_families")
+                        or (apparatus_template.get("reference_list") or {}).get("found")) else
+        "not_found")
     add("content_units", "content", "manuscript text, tables, figures and notes stay unchanged",
         {
             "paragraph_count": source_info.get("paragraph_count"),
@@ -524,22 +558,34 @@ def write_json(path: Path, payload) -> None:
 
 # --------------------------------------------------------------------------- apply
 
-def import_template_styles(template_styles_root, source_styles_root) -> list:
-    """Copy template style definitions the manuscript lacks. Returns the actions taken."""
+def import_template_styles(template_styles_root, source_styles_root,
+                          required_ids=()) -> list:
+    """Copy template style definitions the manuscript lacks. Returns the actions taken.
+
+    A template style whose *name* the manuscript already carries under a different id is still
+    imported when the style mapping points at that id: skipping it by name alone leaves the
+    output using a style id that no longer has a definition, which loses the template's caption,
+    heading or body formatting silently.
+    """
+    required = {style_id for style_id in (required_ids or ()) if style_id}
     existing = {s.get(q("styleId")) for s in source_styles_root.findall(q("style"))}
     names = {style_name(s) for s in source_styles_root.findall(q("style"))}
     actions = []
     for style in template_styles_root.findall(q("style")):
         style_id = style.get(q("styleId"))
         style_type = style.get(q("type")) or "paragraph"
-        if style_id in existing or (style_name(style) and style_name(style) in names):
+        if style_id in existing:
+            continue
+        if style_name(style) and style_name(style) in names and style_id not in required:
             continue
         clone = _copy.deepcopy(style)
         source_styles_root.append(clone)
         existing.add(style_id)
         names.add(style_name(style))
-        actions.append({"imported_style_id": style_id, "name": style_name(style),
-                        "type": style_type, "reason": "template style missing in manuscript"})
+        actions.append({
+            "imported_style_id": style_id, "name": style_name(style), "type": style_type,
+            "reason": ("style is a mapping target the manuscript has no definition for" if
+                       style_id in required else "template style missing in manuscript")})
     return actions
 
 
@@ -681,7 +727,10 @@ def apply_adaptation(source: Path, template: Path, outdir: Path, spec) -> dict:
     if styles_root is None or document_root is None or template_styles_root is None:
         return refuse(outdir, "source or template lacks styles/document parts")
 
-    import_actions = import_template_styles(template_styles_root, styles_root)
+    mapping_spec = (spec or {}).get("style_mapping") or {}
+    import_actions = import_template_styles(
+        template_styles_root, styles_root,
+        required_ids=[record.get("target_style_id") for record in mapping_spec.values()])
     defaults_action = import_doc_defaults(template_styles_root, styles_root)
     before = content_stream(document_root)
     mapping = (spec or {}).get("style_mapping") or {}
@@ -730,6 +779,615 @@ def apply_adaptation(source: Path, template: Path, outdir: Path, spec) -> dict:
         ],
     }
     write_json(outdir / "apply-report.json", report)
+    return report
+
+
+# --------------------------------------------------------------------------- apparatus
+#
+# The organizer's rubric judges 排得对 item by item: heading levels, numbering, figure/table
+# captions and their in-text cross-references, reference entries and headers/footers. Styles,
+# geometry and content preservation are checked elsewhere in this file; the functions below
+# cover the caption/cross-reference/reference-list apparatus, which restyling must not break
+# and which a linked renumber has to keep consistent.
+
+CAPTION_FAMILIES = (
+    ("figure", r"fig(?:ure)?s?\.?"),
+    ("figure", r"图|圖"),
+    ("table", r"tab(?:le)?s?\.?"),
+    ("table", r"表"),
+    ("equation", r"eq(?:uation)?s?\.?"),
+    ("equation", r"式|公式"),
+)
+CAPTION_FAMILY_PATTERNS = tuple(dict.fromkeys(CAPTION_FAMILIES))
+NUMBER_FORMS = r"[0-9]{1,3}|[IVXLCDM]{1,6}|[一二三四五六七八九十]{1,3}"
+CAPTION_TERMINATOR = r"[.:：、\)）]"
+CJK_LABEL_RE = re.compile(r"[图圖表式]|公式")
+SENTENCE_END_RE = re.compile(r"[。！？；]")
+REF_PATTERNS = (
+    ("figure", re.compile(r"(?<![A-Za-z0-9])(?:fig(?:ure)?s?)\.?\s*\(?\s*"
+                          r"([0-9]{1,3})([a-z])?(?![0-9A-Za-z])", re.I)),
+    ("table", re.compile(r"(?<![A-Za-z0-9])(?:tab(?:le)?s?)\.?\s*\(?\s*"
+                         r"([0-9]{1,3})([a-z])?(?![0-9A-Za-z])", re.I)),
+    ("equation", re.compile(r"(?<![A-Za-z0-9])(?:eq(?:uation)?s?)\.?\s*\(?\s*"
+                            r"([0-9]{1,3})([a-z])?(?![0-9A-Za-z])", re.I)),
+    ("figure", re.compile(r"(?<![\u4e00-\u9fff])图(?!表)\s*\(?\s*([0-9]{1,3})\s*\)?(?![0-9])")),
+    ("table", re.compile(r"(?<![\u4e00-\u9fff])表\s*\(?\s*([0-9]{1,3})\s*\)?(?![0-9])")),
+    ("equation", re.compile(r"(?<![\u4e00-\u9fff])(?:式|公式)\s*\(?\s*([0-9]{1,3})\s*\)?(?![0-9])")),
+)
+FIELD_KINDS = ("SEQ", "REF", "PAGEREF", "STYLEREF", "NOTEREF", "TOC", "AUTONUM", "SEQ")
+CAPTION_DETECTION_RULE = (
+    "a paragraph counts as a caption when its paragraph style classifies as the caption role, "
+    "or when it opens with a figure/table/equation label whose number is followed by '.', ':', "
+    "'、', ')' or (for a CJK label without sentence-ending punctuation) a space"
+)
+
+
+def caption_label(text: str, role: str):
+    """Split a caption paragraph's leading label into family, number, letter and number span.
+
+    A roman or CJK numeral is reported but never rewritten: only arabic numerals are
+    machine-comparable, so a linked renumber touches those and says so for the rest.
+    """
+    for family, pattern in CAPTION_FAMILY_PATTERNS:
+        match = re.match(rf"\s*({pattern})\s*({NUMBER_FORMS})\s*([a-z])?\s*"
+                         rf"({CAPTION_TERMINATOR}|\s|$)", text, re.I)
+        if match is None:
+            continue
+        label, number, letter, terminator = match.groups()
+        if terminator.strip() == "" and role != "caption":
+            cjk = bool(CJK_LABEL_RE.search(label))
+            if not (cjk and len(text) <= 120 and not SENTENCE_END_RE.search(text[:80])):
+                continue
+        return {"family": family, "label": label, "number": number, "letter": letter,
+                "number_span": (match.start(2), match.end(2))}
+    return None
+
+
+def ordered_blocks(body):
+    """Document-order list of block dicts (``p``/``tbl``), descending into content controls."""
+    blocks: list = []
+
+    def walk(node) -> None:
+        for child in list(node):
+            tag = child.tag
+            if tag == q("p"):
+                blocks.append({"kind": "paragraph", "node": child})
+            elif tag == q("tbl"):
+                blocks.append({"kind": "table", "node": child})
+            elif tag in (q("sdt"), q("sdtContent"), q("customXml")):
+                walk(child)
+
+    if body is not None:
+        walk(body)
+    return blocks
+
+
+def paragraph_objects(paragraph) -> dict:
+    """What a paragraph carries: a drawing, an equation, both or neither."""
+    return {
+        "drawing": bool(list(paragraph.iter(q("drawing")))
+                         or list(paragraph.iter(q("pict")))
+                         or list(paragraph.iter(q("object")))),
+        "equation": bool(list(paragraph.iter(f"{{{M}}}oMath")))
+                    or bool(list(paragraph.iter(f"{{{M}}}oMathPara"))),
+    }
+
+
+def ordered_text(paragraph) -> str:
+    """Paragraph text in document order, counting a tab/break as one character.
+
+    ``paragraph_text`` appends every tab at the end, so its offsets cannot be used to patch a
+    number inside a paragraph. This model and :func:`text_nodes` share one offset space, which
+    is what a linked renumber needs to rewrite exactly the digits it found.
+    """
+    chunks = []
+    for node in paragraph.iter():
+        if node.tag == q("t"):
+            chunks.append(node.text or "")
+        elif node.tag == q("tab"):
+            chunks.append("\t")
+        elif node.tag == q("br"):
+            chunks.append("\n")
+    return "".join(chunks)
+
+
+def object_kinds(block) -> set:
+    """The object types a block carries: ``{"table"}``, ``{"drawing"}``, ``{"equation"}``."""
+    if block is None:
+        return set()
+    if block["kind"] == "table":
+        return {"table"}
+    found = set()
+    for key, value in paragraph_objects(block["node"]).items():
+        if value:
+            found.add(key)
+    return found
+
+
+def nearest_object(blocks: list, index: int, window: int = 2):
+    """The nearest object around block ``index`` and which side of the caption it is on."""
+    for distance in range(1, window + 1):
+        before = blocks[index - distance] if index - distance >= 0 else None
+        kinds = object_kinds(before)
+        if kinds:
+            return {"side": "before", "distance": distance, "kinds": sorted(kinds)}
+        after = blocks[index + distance] if index + distance < len(blocks) else None
+        kinds = object_kinds(after)
+        if kinds:
+            return {"side": "after", "distance": distance, "kinds": sorted(kinds)}
+    return {"side": None, "distance": None, "kinds": []}
+
+
+def field_inventory(document_root) -> dict:
+    """Field codes and the bookmark targets a REF field needs."""
+    instructions = [node.text or "" for node in document_root.iter(q("instrText"))]
+    instructions += [node.get(q("instr")) or "" for node in document_root.iter(q("fldSimple"))]
+    counts: dict = {}
+    for text in instructions:
+        words = text.strip().split()
+        if not words:
+            continue
+        kind = words[0].upper()
+        if kind in FIELD_KINDS:
+            counts[kind] = counts.get(kind, 0) + 1
+    bookmarks = sorted({node.get(q("name")) for node in document_root.iter(q("bookmarkStart"))
+                        if node.get(q("name"))})
+    targets = sorted({match for text in instructions
+                      for match in re.findall(r"\bREF\s+([A-Za-z0-9_\-:.]+)", text)})
+    return {
+        "field_counts": counts,
+        "toc_field_present": "TOC" in counts,
+        "bookmark_count": len(bookmarks),
+        "ref_targets": targets,
+        "ref_targets_missing": [target for target in targets if target not in bookmarks],
+    }
+
+
+def reference_section(blocks: list, style_roles: dict) -> dict:
+    """Locate the reference list and describe it: entries, label style, ordering, duplicates."""
+    candidates = []
+    for index, block in enumerate(blocks):
+        if block["kind"] != "paragraph":
+            continue
+        text = normalise(paragraph_text(block["node"]))
+        if not text or len(text) > 60:
+            continue
+        if not REFERENCE_RE.search(text):
+            continue
+        role = style_roles.get(paragraph_style_id(block["node"]), "")
+        if role == "heading":
+            candidates.append((index, "heading"))
+        elif len(text) <= 40:
+            candidates.append((index, "short-paragraph"))
+    headings = [index for index, kind in candidates if kind == "heading"]
+    heading_index = headings[-1] if headings else (candidates[-1][0] if candidates else None)
+    if heading_index is None:
+        return {"found": False, "reason": "no reference heading matched in the document"}
+    heading = normalise(paragraph_text(blocks[heading_index]["node"]))
+    entries = []
+    for block in blocks[heading_index + 1:]:
+        if block["kind"] != "paragraph":
+            continue
+        text = normalise(paragraph_text(block["node"]))
+        if not text:
+            continue
+        role = style_roles.get(paragraph_style_id(block["node"]), "")
+        if role == "heading":
+            break
+        entries.append({"text": text[:200], "style_id": paragraph_style_id(block["node"]),
+                        "role": role})
+        if len(entries) >= 400:
+            break
+    labels = []
+    for entry in entries:
+        match = re.match(r"\s*(?:\[(\d{1,3})\]|(\d{1,3})[.)])\s", entry["text"])
+        labels.append(int(match.group(1) or match.group(2)) if match else None)
+    numbered = [value for value in labels if value is not None]
+    seen: dict = {}
+    duplicates = []
+    for entry in entries:
+        key = normalise(entry["text"]).casefold()
+        if key in seen:
+            duplicates.append(entry["text"][:120])
+        seen[key] = True
+    years = sum(1 for entry in entries if re.search(r"\b(19|20)\d{2}[a-z]?\b", entry["text"]))
+    return {
+        "found": True,
+        "heading": heading,
+        "heading_index": heading_index,
+        "entry_count": len(entries),
+            "label_style": ("bracketed-numeric" if entries and re.search(r"^\s*\[\d", entries[0]["text"])
+                        else "numeric" if numbered else "unlabelled"),
+        "numbered_entries": len(numbered),
+        "numbering_monotonic": numbered == sorted(numbered) and len(set(numbered)) == len(numbered),
+        "entries_with_year": years,
+        "duplicate_entries": duplicates,
+        "entries": [entry["text"] for entry in entries[:20]],
+    }
+
+
+def analyse_apparatus_parts(parts: dict, document_root, styles_root):
+    """Caption, cross-reference, reference-list and field analysis of one DOCX document.
+
+    Returns ``(report, edits)``. ``edits`` holds the paragraph nodes and spans a linked
+    renumber would rewrite; the report itself is JSON-serialisable.
+    """
+    styles = describe_styles(styles_root)
+    style_roles = {style_id: classify_style(entry) for style_id, entry in styles.items()}
+    body = document_root.find(q("body")) if document_root is not None else None
+    blocks = ordered_blocks(body)
+    edits: list = []
+
+    captions: list = []
+    unlabelled: list = []
+    for index, block in enumerate(blocks):
+        if block["kind"] != "paragraph":
+            continue
+        paragraph = block["node"]
+        raw_text = ordered_text(paragraph)
+        text = normalise(raw_text)
+        style_id = paragraph_style_id(paragraph)
+        role = style_roles.get(style_id, "")
+        if not text:
+            continue
+        label = caption_label(raw_text, role)
+        if label is None:
+            if role == "caption":
+                unlabelled.append({"order": index, "text": text[:120], "style_id": style_id})
+            continue
+        captions.append({"order": index, "family": label["family"], "label": label["label"],
+                         "number": label["number"], "letter": label["letter"],
+                         "style_id": style_id, "style_role": role,
+                         "text": text[:160], "source_text": raw_text,
+                         "number_span": label["number_span"],
+                         "node": paragraph})
+
+    families: dict = {}
+    for caption in captions:
+        families.setdefault(caption["family"], []).append(caption)
+
+    caption_records = []
+    defects: list = []
+    observations: list = []
+    for family, items in sorted(families.items()):
+        forms = {"arabic" if item["number"].isdigit() else
+                 ("roman" if re.fullmatch(r"[IVXLCDM]+", item["number"], re.I) else "cjk")
+                 for item in items}
+        if len(forms) > 1:
+            defects.append({"kind": "caption_number_form_mixed", "family": family,
+                            "detail": f"the {family} captions mix numbering forms {sorted(forms)}",
+                            "locator": f"word/document.xml caption family '{family}'"})
+        declared: dict = {}
+        for sequence, item in enumerate(items, start=1):
+            order = item["order"]
+            nearest = nearest_object(blocks, order)
+            if family == "table":
+                expected = "the table follows its caption"
+                observed = ("table follows" if nearest["side"] == "after" else
+                            "table precedes" if nearest["side"] == "before" else
+                            "no table within two blocks")
+                convention_met = nearest["side"] == "after"
+            else:
+                expected = "the caption follows the object it labels"
+                observed = ("object precedes" if nearest["side"] == "before" else
+                            "object follows" if nearest["side"] == "after" else
+                            "no object within two blocks")
+                convention_met = nearest["side"] == "before"
+            placement_ok = bool(nearest["kinds"])
+            consistent = (str(sequence) == item["number"]) if item["number"].isdigit() else None
+            if consistent is False:
+                ordinal = "11th" if sequence % 100 == 11 else ("12th" if sequence % 100 == 12 else
+                                                               "13th" if sequence % 100 == 13 else
+                                                               f"{sequence}th" if sequence % 10 > 3 or
+                                                               sequence % 10 == 0 else
+                                                               f"{sequence}st" if sequence % 10 == 1
+                                                               else f"{sequence}nd" if
+                                                               sequence % 10 == 2 else
+                                                               f"{sequence}rd")
+                defects.append({
+                    "kind": "caption_number_out_of_sequence", "family": family,
+                    "detail": f"{item['label']} {item['number']} is the {ordinal} {family} "
+                              f"caption in document order",
+                    "locator": f"word/document.xml paragraph {order}: {item['text'][:80]}"})
+            if not placement_ok:
+                defects.append({
+                    "kind": "caption_without_object", "family": family,
+                    "detail": f"{item['label']} {item['number']} has no figure/table/equation "
+                              f"within two blocks either side",
+                    "locator": f"word/document.xml paragraph {order}: {item['text'][:80]}"})
+            elif not convention_met:
+                observations.append({
+                    "kind": "caption_placement_convention", "family": family,
+                    "detail": f"{item['label']} {item['number']}: {observed} (at distance "
+                              f"{nearest['distance']}); some templates place {family} captions the "
+                              f"other way round - confirm against the template before changing it",
+                    "locator": f"word/document.xml paragraph {order}"})
+            if item["number"] in declared:
+                defects.append({
+                    "kind": "caption_number_duplicate", "family": family,
+                    "detail": f"{item['label']} {item['number']} appears more than once",
+                    "locator": f"word/document.xml paragraph {order}"})
+                declared[item["number"]] = declared[item["number"]] + 1
+            else:
+                declared[item["number"]] = 1
+            caption_records.append({
+                "order": order, "family": family, "label": item["label"],
+                "declared_number": item["number"], "sequence_position": sequence,
+                "number_consistent": consistent, "style_id": item["style_id"],
+                "style_role": item["style_role"], "placement_expected": expected,
+                "placement_observed": observed, "placement_ok": placement_ok,
+                "object_distance": nearest["distance"], "object_kinds": nearest["kinds"],
+                "text": item["text"], "source_text": item["source_text"]})
+            if consistent is False:
+                edits.append({"node": item["node"], "span": item["number_span"],
+                              "old": item["number"], "new": str(sequence), "kind": "caption",
+                              "family": family, "locator": f"paragraph {order}",
+                              "origin_text": item["source_text"],
+                              "raw_span": item["number_span"]})
+
+    caption_index = {}
+    for record in caption_records:
+        if record["declared_number"].isdigit():
+            caption_index.setdefault(record["family"], set()).add(
+                int(record["declared_number"]))
+
+    references = []
+    caption_orders = {record["order"] for record in caption_records}
+    for index, block in enumerate(blocks):
+        if block["kind"] != "paragraph" or index in caption_orders:
+            continue
+        paragraph = block["node"]
+        raw_text = ordered_text(paragraph)
+        text = normalise(raw_text)
+        if not text:
+            continue
+        style_id = paragraph_style_id(paragraph)
+        if style_roles.get(style_id, "") == "caption":
+            continue
+        for family, pattern in REF_PATTERNS:
+            for match in pattern.finditer(raw_text):
+                number = match.group(1)
+                known = caption_index.get(family, set())
+                targets = {int(value) for value in known}
+                status = ("resolved" if number.isdigit() and int(number) in targets
+                          else "dangling" if known else "no_captions_in_family")
+                references.append({
+                    "order": index, "family": family, "number": number,
+                    "text": match.group(0).strip(), "context": text[:160],
+                    "style_id": style_id, "status": status,
+                    "span": (match.start(1), match.end(1)), "node": paragraph})
+                if status == "dangling":
+                    defects.append({
+                        "kind": "cross_reference_dangling", "family": family,
+                        "detail": f"'{match.group(0).strip()}' points at {family} {number}, but the "
+                                  f"document's {family} captions are {sorted(known)}",
+                        "locator": f"word/document.xml paragraph {index}"})
+
+    reference_list = reference_section(blocks, style_roles)
+    if reference_list.get("duplicate_entries"):
+        defects.append({
+            "kind": "reference_entry_duplicated",
+            "detail": f"{len(reference_list['duplicate_entries'])} reference entries repeat an "
+                      f"earlier entry verbatim",
+            "locator": "word/document.xml reference section"})
+    if reference_list.get("found") and not reference_list.get("numbering_monotonic"):
+        defects.append({
+            "kind": "reference_numbering_not_monotonic",
+            "detail": "numeric reference labels are not in increasing order without repeats",
+            "locator": "word/document.xml reference section"})
+
+    fields = field_inventory(document_root)
+    if fields["ref_targets_missing"]:
+        defects.append({
+            "kind": "ref_field_target_missing",
+            "detail": f"REF fields point at bookmarks that do not exist: "
+                      f"{fields['ref_targets_missing']}",
+            "locator": "word/document.xml field codes"})
+
+    families_summary = {family: len(items) for family, items in sorted(families.items())}
+    applicable = bool(captions) or bool(reference_list.get("found"))
+    report = {
+        "schema": "template-adaptation-linkage/v1",
+        "detection_rule": CAPTION_DETECTION_RULE,
+        "captions": [{key: value for key, value in record.items()} for record in caption_records],
+        "caption_families": families_summary,
+        "caption_style_paragraphs_without_label": unlabelled,
+        "cross_references": [{key: value for key, value in reference.items()
+                              if key not in ("node", "span")} for reference in references],
+        "reference_list": reference_list,
+        "fields": fields,
+        "counts": {
+            "captions": len(caption_records),
+            "captions_consistent": sum(1 for record in caption_records
+                                       if record["number_consistent"] is not False),
+            "cross_references": len(references),
+            "cross_references_dangling": sum(1 for reference in references
+                                             if reference["status"] == "dangling"),
+        },
+        "defects": defects,
+        "observations": observations,
+        "status": ("needs_work" if defects else "consistent") if applicable else "not_applicable",
+    }
+    return report, edits
+
+
+def empty_apparatus_report(reason: str) -> dict:
+    """The shape every reader of the linkage report can rely on, for an unreadable input."""
+    return {
+        "schema": "template-adaptation-linkage/v1",
+        "detection_rule": CAPTION_DETECTION_RULE,
+        "status": "unreadable",
+        "error": reason,
+        "captions": [],
+        "caption_families": {},
+        "caption_style_paragraphs_without_label": [],
+        "cross_references": [],
+        "reference_list": {"found": False, "reason": "document unreadable"},
+        "fields": {"field_counts": {}, "ref_targets": [], "ref_targets_missing": [],
+                   "bookmark_count": 0, "toc_field_present": False},
+        "counts": {"captions": 0, "captions_consistent": 0, "cross_references": 0,
+                   "cross_references_dangling": 0},
+        "defects": [],
+        "observations": [],
+    }
+
+
+def analyse_apparatus(path: Path) -> dict:
+    """Run :func:`analyse_apparatus_parts` on a DOCX path and report unreadable input honestly."""
+    path = Path(path)
+    if not path.exists():
+        return empty_apparatus_report(f"{path} does not exist")
+    try:
+        parts, _ = read_zip_parts(path)
+        document_root = xml_root(parts, "word/document.xml")
+        styles_root = xml_root(parts, "word/styles.xml")
+    except (zipfile.BadZipFile, OSError, ET.ParseError) as error:
+        return empty_apparatus_report(repr(error))
+    if document_root is None:
+        return empty_apparatus_report("word/document.xml missing or unparsable")
+    report, _ = analyse_apparatus_parts(parts, document_root, styles_root)
+    return report
+
+
+def text_nodes(paragraph) -> list:
+    """``(element, start, end)`` for every text-bearing node of a paragraph, in order."""
+    nodes = []
+    offset = 0
+    for node in paragraph.iter():
+        if node.tag == q("t"):
+            text = node.text or ""
+            nodes.append((node, offset, offset + len(text), "text"))
+            offset += len(text)
+        elif node.tag in (q("tab"), q("br")):
+            nodes.append((node, offset, offset + 1, "special"))
+            offset += 1
+    return nodes
+
+
+def patch_paragraph(paragraph, span: tuple, replacement: str) -> bool:
+    """Replace one character span of a paragraph, keeping the runs around it intact."""
+    start, end = span
+    nodes = text_nodes(paragraph)
+    if not nodes or start >= end:
+        return False
+    touched = False
+    for node, node_start, node_end, kind in nodes:
+        if node_end <= start or node_start >= end:
+            continue
+        if kind == "special":
+            continue
+        text = node.text or ""
+        keep_before = text[:max(0, start - node_start)]
+        keep_after = text[max(0, end - node_start):] if node_end > end else ""
+        node.text = keep_before + replacement + keep_after
+        replacement = ""
+        touched = True
+    return touched
+
+
+def linkage(source: Path, output, outdir: Path, renumber: bool, out_file) -> dict:
+    """Audit (and optionally repair) caption numbering, cross-references and the reference list."""
+    outdir = Path(outdir)
+    outdir.mkdir(parents=True, exist_ok=True)
+    source = Path(source)
+    target = Path(output) if output else source
+    report = analyse_apparatus(target)
+    report["source"] = {"path": str(source), "sha256": sha256_file(source) if source.exists() else None}
+    report["audited"] = {"path": str(target), "sha256": sha256_file(target) if target.exists() else None}
+    report["renumbered"] = None
+    if not renumber:
+        write_json(outdir / "linkage-report.json", report)
+        return report
+
+    parts, names = read_zip_parts(target)
+    document_root = xml_root(parts, "word/document.xml")
+    styles_root = xml_root(parts, "word/styles.xml")
+    detail, edits = analyse_apparatus_parts(parts, document_root, styles_root)
+    by_family: dict = {}
+    for edit in edits:
+        by_family.setdefault(edit["family"], []).append(edit)
+    by_family = {family: sorted(family_edits, key=lambda entry: int(entry["locator"]
+                                                                    .split()[1]))
+                 for family, family_edits in by_family.items()}
+    ambiguous = []
+    for family, family_edits in by_family.items():
+        mapping = {edit["old"]: edit["new"] for edit in family_edits}
+        if len(set(mapping.values())) != len(mapping):
+            ambiguous.append({"family": family, "mapping": mapping,
+                              "reason": "two captions would end up with the same number"})
+        for edit in family_edits:
+            origin = edit.get("origin_text") or ""
+            start, end = edit.get("raw_span") or (0, 0)
+            if origin[start:end] != edit["old"]:
+                # The digit span does not address the raw text any more (a tab or line break
+                # inside the label). Refuse rather than shift a character.
+                ambiguous.append({
+                    "family": family, "caption": origin[:80],
+                    "reason": "the caption label's digit span does not address the raw text "
+                              "(a tab or line break sits inside the label)"})
+    if ambiguous:
+        report["status"] = "ambiguous"
+        report["renumber_refused"] = ambiguous
+        write_json(outdir / "linkage-report.json", report)
+        return report
+
+    applied = []
+    for edit in edits:
+        if patch_paragraph(edit["node"], edit["span"], edit["new"]):
+            applied.append({"kind": edit["kind"], "family": edit["family"],
+                            "from": edit["old"], "to": edit["new"],
+                            "locator": edit["locator"]})
+    mapping = {family: {edit["old"]: edit["new"] for edit in family_edits}
+               for family, family_edits in by_family.items()}
+    caption_orders = {int(record["order"]) for record in detail.get("captions") or []}
+    reference_edits = []
+    follow_ups = []
+    for index, block in enumerate(ordered_blocks(document_root.find(q("body")))):
+        if block["kind"] != "paragraph" or index in caption_orders:
+            continue
+        paragraph = block["node"]
+        raw_text = ordered_text(paragraph)
+        if not normalise(raw_text):
+            continue
+        pending = []
+        for family, pattern in REF_PATTERNS:
+            for match in pattern.finditer(raw_text):
+                number = match.group(1)
+                replacement = (mapping.get(family) or {}).get(number)
+                if not replacement or replacement == number:
+                    continue
+                pending.append((match.start(1), match.end(1), family, number, replacement,
+                                match.group(0).strip()))
+        # right to left, so a replacement that changes the length cannot shift a later span
+        for start, end, family, number, replacement, text in sorted(pending, reverse=True):
+            if patch_paragraph(paragraph, (start, end), replacement):
+                reference_edits.append({"family": family, "from": number,
+                                        "to": replacement, "text": text})
+                follow_ups.append({"kind": "cross_reference", "family": family,
+                                   "from": number, "to": replacement,
+                                   "locator": f"in-text reference '{text}'"})
+
+    destination = Path(out_file) if out_file else outdir / "renumbered.docx"
+    parts["word/document.xml"] = ET.tostring(document_root, encoding="UTF-8", xml_declaration=True)
+    with zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as package:
+        for name in names:
+            package.writestr(name, parts[name])
+    after = analyse_apparatus(destination)
+    report["renumbered"] = {
+        "path": str(destination),
+        "sha256": sha256_file(destination),
+        "mapping": mapping,
+        "caption_edits": [entry for entry in applied if entry["kind"] == "caption"],
+        "cross_reference_edits": reference_edits,
+        "all_edits": applied + follow_ups,
+        "defects_remaining": len(after.get("defects") or []),
+        "defects_after": [defect["kind"] for defect in after.get("defects") or []],
+        "status_after": after.get("status"),
+        "note": "A cross-reference to a caption that never existed cannot be pointed at anything "
+                "by renumbering; it stays listed as a defect for the author to resolve.",
+    }
+    report["status"] = "renumbered" if not after.get("defects") else "renumbered_with_defects"
+    write_json(outdir / "linkage-report.json", report)
     return report
 
 
@@ -795,8 +1453,8 @@ def verify(source: Path, output: Path, spec, outdir: Path) -> dict:
               src_info.get(key) == out_info.get(key),
               f"source={src_info.get(key)} output={out_info.get(key)}", str(output))
 
+    template_path = ((spec or {}).get("template") or {}).get("path")
     if spec:
-        template_path = (spec.get("template") or {}).get("path")
         template_section = None
         template_defaults = None
         if template_path and Path(template_path).exists():
@@ -868,6 +1526,53 @@ def verify(source: Path, output: Path, spec, outdir: Path) -> dict:
                   f"tables using '{style_id}': {sum(1 for a in applied if a)}/{len(applied)}; "
                   f"style defined={style_id in output_styles}",
                   "output word/document.xml tblPr/tblStyle")
+
+    # Captions, cross-references, reference entries and field targets are compared output-against-
+    # source: an adaptation may leave a defect it inherited, but it must not create or hide one.
+    source_apparatus = analyse_apparatus(source)
+    output_apparatus = analyse_apparatus(output) if well_formed else empty_apparatus_report(
+        "output is not a readable DOCX package")
+    source_count = (source_apparatus.get("counts") or {}).get("captions") or 0
+    output_count = (output_apparatus.get("counts") or {}).get("captions") or 0
+    if source_count:
+        source_labels = [f"{c['family']} {c['declared_number']}"
+                         for c in source_apparatus.get("captions") or []]
+        output_labels = [f"{c['family']} {c['declared_number']}"
+                         for c in output_apparatus.get("captions") or []]
+        check(checks, "caption_inventory_preserved",
+              "every caption label the manuscript declares is still declared by the output",
+              source_labels == output_labels,
+              f"source={source_labels} output={output_labels}",
+              "word/document.xml caption labels in document order")
+    source_dangling = (source_apparatus.get("counts") or {}).get("cross_references_dangling") or 0
+    output_dangling = (output_apparatus.get("counts") or {}).get("cross_references_dangling") or 0
+    check(checks, "cross_reference_resolution_preserved",
+          "the adaptation does not orphan an in-text figure/table/equation reference",
+          output_dangling <= source_dangling,
+          f"dangling in-text references: source={source_dangling} output={output_dangling}",
+          "word/document.xml caption inventory x in-text references")
+    source_refs = source_apparatus.get("reference_list") or {}
+    output_refs = output_apparatus.get("reference_list") or {}
+    if source_refs.get("found"):
+        same_entries = (source_refs.get("entry_count") == output_refs.get("entry_count")
+                        and source_refs.get("entries") == output_refs.get("entries"))
+        check(checks, "reference_list_preserved",
+              "the reference list keeps its heading and its entries",
+              bool(output_refs.get("found")) and same_entries,
+              f"source entries={source_refs.get('entry_count')} heading="
+              f"'{source_refs.get('heading')}'; output entries={output_refs.get('entry_count')} "
+              f"heading='{output_refs.get('heading')}'",
+              "word/document.xml reference section")
+    source_fields = ((source_apparatus.get("fields") or {}).get("field_counts") or {})
+    output_fields = ((output_apparatus.get("fields") or {}).get("field_counts") or {})
+    if source_fields:
+        missing_codes = {kind: (count, output_fields.get(kind, 0))
+                         for kind, count in source_fields.items()
+                         if output_fields.get(kind, 0) < count}
+        check(checks, "field_codes_preserved",
+              "field codes (SEQ/REF/PAGEREF/TOC) survive the adaptation",
+              not missing_codes, f"source={source_fields} output={output_fields}",
+              "word/document.xml instrText/fldSimple")
 
     failures = [c for c in checks if c["status"] == "fail"]
     report = {
@@ -971,6 +1676,15 @@ def main(argv=None) -> int:
     p_preview.add_argument("--docx", required=True)
     p_preview.add_argument("--outdir", required=True)
 
+    p_linkage = sub.add_parser("linkage")
+    p_linkage.add_argument("--source", required=True, help="the manuscript, for the hash trail")
+    p_linkage.add_argument("--output", help="the adapted DOCX to audit (default: the source)")
+    p_linkage.add_argument("--outdir", required=True)
+    p_linkage.add_argument("--renumber", action="store_true",
+                           help="also write a copy with caption numbers and the in-text "
+                                "cross-references that point at them updated together")
+    p_linkage.add_argument("--out-file", help="where --renumber writes its copy")
+
     args = parser.parse_args(argv)
     if args.command == "inspect":
         payload = inventory(Path(args.path))
@@ -1002,6 +1716,20 @@ def main(argv=None) -> int:
         print(json.dumps({k: report.get(k) for k in
                           ("renderer_available", "pdf", "pngs", "note")}, ensure_ascii=False))
         return 0
+    if args.command == "linkage":
+        report = linkage(Path(args.source), args.output, Path(args.outdir), args.renumber,
+                         args.out_file)
+        print(json.dumps({
+            "status": report.get("status"),
+            "captions": (report.get("counts") or {}).get("captions"),
+            "cross_references": (report.get("counts") or {}).get("cross_references"),
+            "dangling_cross_references": (report.get("counts") or {}).get("cross_references_dangling"),
+            "defect_kinds": sorted({d["kind"] for d in report.get("defects") or []}),
+            "observation_kinds": sorted({o["kind"] for o in report.get("observations") or []}),
+            "renumbered": (report.get("renumbered") or {}).get("path"),
+            "out": str(Path(args.outdir) / "linkage-report.json"),
+        }, ensure_ascii=False))
+        return 0 if report.get("status") in ("consistent", "not_applicable", "renumbered") else 3
     return 1
 
 

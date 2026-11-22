@@ -1,6 +1,7 @@
 ---
 name: publication-quality-data-visualisation
-description: Use when research data must become a publication-quality figure: chart type matched to the data, encoding declared in a manifest, axes and annotation checked, error bars defined, and an export that survives print.
+description: |-
+  Use when research data must become a publication-quality figure: chart type matched to the data, encoding declared in a manifest, axes and annotation checked, error bars defined, and an export that survives print.
 ---
 
 ## Two commands, then the work

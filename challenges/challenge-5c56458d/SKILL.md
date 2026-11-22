@@ -1,6 +1,7 @@
 ---
 name: database-query-and-analysis
-description: Use when a research question must be answered from a database: schema-validated SQL, join correctness checked against key uniqueness, field semantics explained, and a result traceable back to the query that produced it.
+description: |-
+  Use when a research question must be answered from a database: schema-validated SQL, join correctness checked against key uniqueness, field semantics explained, and a result traceable back to the query that produced it.
 ---
 
 ## Two commands, then the work

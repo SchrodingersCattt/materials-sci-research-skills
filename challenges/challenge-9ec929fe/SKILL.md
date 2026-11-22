@@ -1,6 +1,7 @@
 ---
 name: analysis-code-generation-and-execution
-description: Use when analysis code must be written and actually run: environment and seed captured, paths and field names resolved against the schema, results verified against the input, and errors diagnosed rather than worked around.
+description: |-
+  Use when analysis code must be written and actually run: environment and seed captured, paths and field names resolved against the schema, results verified against the input, and errors diagnosed rather than worked around.
 ---
 
 ## Two commands, then the work

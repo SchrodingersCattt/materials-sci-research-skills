@@ -1,6 +1,7 @@
 ---
 name: academic-norms-and-compliance
-description: Use when a manuscript must be checked against academic norms: authorship and contributions, dual submission, data and code availability, ethics approval and conflict-of-interest declarations, with each gap located.
+description: |-
+  Use when a manuscript must be checked against academic norms: authorship and contributions, dual submission, data and code availability, ethics approval and conflict-of-interest declarations, with each gap located.
 ---
 
 ## Two commands, then the work

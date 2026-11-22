@@ -1,6 +1,7 @@
 ---
 name: literature-screening-and-ranking
-description: Use when candidate records must be screened and ranked: a stated relevance basis per record, ranking on declared fields, and uncertain cases kept uncertain rather than forced.
+description: |-
+  Use when candidate records must be screened and ranked: a stated relevance basis per record, ranking on declared fields, and uncertain cases kept uncertain rather than forced.
 ---
 
 ## Two commands, then the work

@@ -1,6 +1,7 @@
 ---
 name: document-parsing-with-reading-order
-description: Use when a scientific PDF must be parsed into verifiable text: multi-column reading order, heading hierarchy, complex tables, formulas and special characters, and scanned pages -- with a locator for every extracted span.
+description: |-
+  Use when a scientific PDF must be parsed into verifiable text: multi-column reading order, heading hierarchy, complex tables, formulas and special characters, and scanned pages -- with a locator for every extracted span.
 ---
 
 ## Two commands, then the work

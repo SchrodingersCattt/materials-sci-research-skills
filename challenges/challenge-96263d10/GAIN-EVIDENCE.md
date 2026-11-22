@@ -10,6 +10,7 @@ skill and that anyone can re-run.
 
 ```bash
 python "$SKILL_DIR/tests/gain_checks.py" --workdir work/gain
+python "$SKILL_DIR/tests/linkage_checks.py" --workdir work/linkage
 ```
 
 ## What the shipped self-test measured on this machine
@@ -22,6 +23,26 @@ python "$SKILL_DIR/tests/gain_checks.py" --workdir work/gain
 - Empty answer: refused with exit code 2.
 
 Self-test verdict: **pass**, 7 checks, 0 failures.
+
+## What the apparatus control measured
+
+`tests/linkage_checks.py` builds the same realistic-size manuscript twice, once with planted
+defects and once clean, and runs the audit on both. Measured on this machine:
+
+- defective: status `needs_work`, 6 captions in 3 families, 6 in-text references of which 1
+  dangling, and all four planted defect kinds reported -
+  `caption_number_out_of_sequence` (3 captions, each named), `cross_reference_dangling`,
+  `reference_entry_duplicated`, `reference_numbering_not_monotonic`.
+- clean: status `consistent`, no defect, no observation, 12 reference entries, 0 dangling
+  references.
+- after `linkage --renumber` on the defective copy: no caption is left out of sequence, the
+  in-text references that pointed at renumbered captions moved with them, the reference list is
+  unchanged, and the reference to a caption that never existed stays listed as a defect instead of
+  being pointed at something arbitrary.
+- the same control also covers a template style whose *name* the manuscript reuses under a
+  different id: before the fix the output used an undefined style and
+  `style_definitions_present` failed; the control now asserts the mapping target is imported and
+  the caption style mapping is checked.
 
 ## What the check defines: two numbers, no prose
 

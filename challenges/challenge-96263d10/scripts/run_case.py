@@ -139,6 +139,10 @@ def collect_deliverables(work: Path, out: Path) -> list:
     return copied
 
 
+def candidates_suffix(index: int) -> str:
+    return "" if index == 1 else str(index)
+
+
 def cmd_plan(args) -> int:
     work = Path(args.work)
     work.mkdir(parents=True, exist_ok=True)
@@ -256,6 +260,31 @@ def cmd_finish(args) -> int:
 
     report["copied_to_output"] = collect_deliverables(work, out)
 
+    # The adaptation's own apparatus audit: caption numbering, the in-text references that point
+    # at those captions, reference-list integrity and field codes. It runs here so the run does not
+    # have to spend a model request deciding to look.
+    apparatus = script("adapt_template.py")
+    adapted = [Path(item) for item in (args.adapted or [])]
+    if not adapted and (work / "adapted" / "adapted.docx").exists():
+        adapted = [work / "adapted" / "adapted.docx"]
+    if apparatus and adapted:
+        for index, path in enumerate(adapted, start=1):
+            result = call([apparatus, "linkage", "--source", args.source or path,
+                           "--output", path, "--outdir", work / "linkage"])
+            report["stages"][f"linkage:{path.name}"] = result["rc"]
+            payload = result.get("json") or {}
+            report[f"linkage{candidates_suffix(index)}"] = {
+                key: payload.get(key) for key in
+                ("status", "captions", "cross_references", "dangling_cross_references",
+                 "defect_kinds", "observation_kinds")}
+            if payload.get("defect_kinds"):
+                report["linkage_defects"] = payload["defect_kinds"]
+    elif apparatus:
+        report["stages"]["linkage"] = ("skipped: no adapted DOCX under work/adapted; pass "
+                                       "--adapted <docx> or run adapt_template.py linkage yourself")
+    else:
+        report["stages"]["linkage"] = "skipped: no adapt_template.py in this skill"
+
     audit = script("quantity_audit.py")
     plan_file = work / "quantity-plan.json"
     if audit and plan_file.exists():
@@ -337,6 +366,12 @@ def main() -> int:
                              "(default: /input/material, /input/data, /input)")
     finish.add_argument("--per-file", action="store_true",
                         help="build one document per markdown file instead of one combined file")
+    finish.add_argument("--adapted", action="append", default=[],
+                        help="an adapted DOCX to audit for caption numbering, in-text "
+                             "cross-references, reference entries and field codes "
+                             "(default: work/adapted/adapted.docx when it exists)")
+    finish.add_argument("--source", default="",
+                        help="the manuscript the adapted DOCX came from, for the audit's hash trail")
     finish.add_argument("--case-id", default="")
     finish.set_defaults(func=cmd_finish)
     args = parser.parse_args()

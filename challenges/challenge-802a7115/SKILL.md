@@ -1,6 +1,7 @@
 ---
 name: cross-language-literature-search
-description: Use when the corpus spans languages: synonym sets across languages, translation recorded as a translation, and matches from a mapping distinguishable from matches in the text.
+description: |-
+  Use when the corpus spans languages: synonym sets across languages, translation recorded as a translation, and matches from a mapping distinguishable from matches in the text.
 ---
 
 ## Two commands, then the work

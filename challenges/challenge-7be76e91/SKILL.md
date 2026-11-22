@@ -1,6 +1,7 @@
 ---
 name: protocol-comparison-and-selection
-description: Use when several candidate routes must be compared and one chosen: identical fields across candidates, risks with trigger and mitigation, full cost including machine time and labour, and an explicit rejection reason for each route.
+description: |-
+  Use when several candidate routes must be compared and one chosen: identical fields across candidates, risks with trigger and mitigation, full cost including machine time and labour, and an explicit rejection reason for each route.
 ---
 
 ## Two commands, then the work

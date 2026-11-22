@@ -34,6 +34,76 @@ comparable - fix the inputs, do not read it as a pass. Put the resulting `gain.j
 output directory: it is runtime evidence the reviewer can re-run, which prose cannot replace.
 <!-- gain-evidence:end -->
 
+## Which shape is the answer? Detect it first, then follow that contract
+
+The reading cases come in two published shapes, and the field names differ. Read the input before
+choosing, and never answer a question list with a field table (or the reverse).
+
+```bash
+python "$SKILL_DIR/scripts/literature_qa.py" plan --input /input \
+    --result /app/output/result.json --alternate /app/answers.json --out /app/work/qa-plan.json
+```
+
+**Shape A - a question list over one paper** (`/input/case.json` carrying `questions` and numbered
+`paragraphs`; the 文献智能问答 statement). The published result is one entry per question, and the
+plan command prints the exact field list to fill:
+
+| Where | Required |
+|---|---|
+| top level | the input identity, echoed unchanged: `case_id`, `paper_id`, `material_version`; plus `answers[]` and `coverage` |
+| `answers[]` | one entry **per question, none omitted**, with `question_id`, `answer`, `conditions[]`, `status`, `claims[]`, `unanswered_parts[]` |
+| `status` | exactly one of `answered`, `partial`, `insufficient_evidence`, `input_error` |
+| `claims[]` | `claim_id`, `text`, `kind`, `evidence[]`; `kind` is `reported` (the paper says it) or `inferred` (you concluded it) |
+| `evidence[]` | `paragraph_id` and a verbatim `quote` from the supplied text |
+| `unanswered_parts[]` | always present; every entry carries a `reason` |
+| `coverage` | `read` and `unread`, each unread entry with its own reason |
+
+Two paths are published for this shape: the adapted main artifact `/app/output/result.json`, and the
+originally published `/app/answers.json`. Write the result to the first, then
+
+```bash
+python "$SKILL_DIR/scripts/literature_qa.py" preflight --result /app/output/result.json \
+    --case /input/case.json --outdir /app/work/preflight        # audit: exits 3 listing every failure
+python "$SKILL_DIR/scripts/literature_qa.py" mirror --result /app/output/result.json \
+    --also /app/answers.json --out /app/work/mirror.json        # second path, or a reported reason
+```
+
+`preflight` is the check that a reviewer would run by hand, and it fails on the two things that
+falsify a bundle: a quotation that is not in the supplied text, and a `reported` number that does not
+appear in its own quotation. Question text and the task statement are deliberately **not** quotable -
+quoting the question back is not evidence about the paper. A `partial` or `insufficient_evidence`
+answer must name the parts it did not answer; a `partial` one may still carry `reported` claims for
+the parts it did answer.
+
+**Shape B - a field or question declaration in its own file** (a `target-fields.json`, or a generic
+`case_id` + `output_contract`): use the generic path below (`reading_contract.py`), whose status
+vocabulary is `reported` / `not_reported` / `source_conflict` / `extraction_failed`. When the
+declaration names a `field_id` per requested value, `field_semantics.py` is the targeted path:
+
+```bash
+python "$SKILL_DIR/scripts/field_semantics.py" plan --fields /input/target-fields.json \
+    --result /app/output/result.json --out /app/work/field-plan.json
+python "$SKILL_DIR/scripts/field_semantics.py" check --answer /app/output/result.json \
+    --fields /input/target-fields.json --material /input --outdir /app/work/field-check
+```
+
+Two rules come from the published statement and are checked, not merely remembered:
+
+- **An absent field is not zero.** A field the paper does not carry keeps an empty value and the
+  status `not_reported`; `0`, `-`, `n/a` and a blank are not a value and not a refusal, and the audit
+  names them (`field.<id>.absent_is_not_zero`).
+- **A literal quotation match alone does not establish semantic correctness.** A verbatim sentence
+  can carry the right number for a different statistic, condition or unit, so the quotation has to
+  demonstrate the requested statistic, condition and unit (`field.<id>.semantic_statistic`,
+  `semantic_condition`, `semantic_unit`), and an unmatched word is checked against the declared
+  spelling and its synonyms. Where a comparison is phrased by naming the other specimen rather than
+  the declared phrase, that is not treated as a defect - the audit says which check it is not making.
+- With `--material` the quotation is also verified as verbatim against the supplied text
+  (`field.<id>.quote_verbatim`), which is what separates a real quotation from a composed sentence.
+
+Whenever a script refers to itself or its data, use the mount path the platform uses -
+`/skills/literature-qa/...` - so the reviewer can open the same absolute path the run used.
+
 ## Budget order (do this first)
 
 Three cases run three times each under a 64-request / 900-second budget, so the order matters more
@@ -58,9 +128,19 @@ do not quote a sentence you did not read, and do not let a partial reading look 
   `environment/resources.yaml`. Read the actual text; a section title is not the passage.
 - Work in `/app/work`; deliverables in `/app/output`, including `result.json` with the
   **original `case_id` and every original `output_contract` field**, original names, nesting and
-  types.
-- Tool: `"$SKILL_DIR/scripts/reading_contract.py"` (`SKILL_DIR` = the real directory of the loaded
-  `SKILL.md`). Python 3.10+, standard library only: no network, no pip, no PDF or OCR library.
+  types. For a question-shaped case, the same document goes to `/app/answers.json` as well.
+- Tools, all standard-library Python 3.10+ (`SKILL_DIR` = the real directory of the loaded
+  `SKILL.md`, `/skills/literature-qa` in the evaluation image):
+  - `scripts/literature_qa.py` - question-shaped cases: `plan` (schedule the questions, print the
+    required field list), `preflight` (audit the result and exit 3 with the failing check ids),
+    `mirror` (write the second published path, or report why not)
+  - `scripts/reading_contract.py` - field-shaped cases: extract the contract, check the answer,
+    verify the envelope
+  - `scripts/field_semantics.py` - a `field_id`-keyed declaration: schedule the requested fields and
+    audit semantic correctness, where the quotation must demonstrate the requested statistic,
+    condition and unit
+  - `scripts/contract_check.py`, `scripts/number_scan.py` - contract conformance and numeric
+    traceability
 - Budget: 64 model requests, 900 s, 16384 output tokens per response.
 - The answer is checked line by line: every requested item appears once, every `reported` value has
   a locator and a quotation that is actually in the material, and every gap is stated in the case's
@@ -76,6 +156,8 @@ do not quote a sentence you did not read, and do not let a partial reading look 
    `python "$SKILL_DIR/scripts/reading_contract.py" contract --case /input/case.json --out /app/work/contract.json`
    (add `--fields`/`--questions` when they are separate files). It lists every requested field id
    and question id with the status vocabulary the case uses, so nothing can be silently dropped.
+   When the case is question-shaped, `literature_qa.py plan` is the equivalent first step and it
+   also prints the result field list; run both if unsure which shape the case is.
 2. **Read the material and fill the entries.** For each requested field: the value exactly as the
    material states it (with its unit), the paragraph/section/page locator, and a short **verbatim**
    quotation. For each question: the answer, its conditions, its claims with evidence entries, and
@@ -215,21 +297,37 @@ partially guessed.
 | `CHECKLIST.md` | one pass-through list per run, one question per published sub-point |
 | `CHANGELOG.md` | versioning and maintenance policy |
 | `templates/` | glossary, reference map, change log, deliverable plan and pointer templates |
+| `scripts/literature_qa.py` | the question-shaped contract: schedule the questions, audit the result, mirror the second published path |
+| `scripts/reading_contract.py` | the field-shaped contract: enumerate the requested fields, check the answer, verify the envelope |
+| `scripts/field_semantics.py` | a `field_id`-keyed declaration: schedule the fields, audit that the quotation demonstrates the statistic, condition and unit |
 | `tests/cases/` | reusable interface items with structural expectations |
+| `tests/qa_checks.py` | the question-shaped fixture and its negative controls (13 planted defects) |
+| `tests/field_checks.py` | the field-declaration fixture and its negative controls (11 planted defects) |
 
 These are submission materials, not case answers: no organizer case, whiteboard or formal result is
 included anywhere in this bundle.
 
 ## Minimal example (synthetic, not a case)
 
-```
+```bash
+# field-shaped case
 python "$SKILL_DIR/scripts/reading_contract.py" contract --case /app/work/fixture/case.json --out /app/work/contract.json
 python "$SKILL_DIR/scripts/reading_contract.py" check --answer /app/work/fixture/answer-good.json --case /app/work/fixture/case.json --outdir /app/work/check
 python "$SKILL_DIR/scripts/reading_contract.py" verify --answer /app/work/fixture/answer-good.json --outdir /app/work/check
+
+# question-shaped case
+python "$SKILL_DIR/scripts/literature_qa.py" plan --input /input --out /app/work/qa-plan.json
+python "$SKILL_DIR/scripts/literature_qa.py" preflight --result /app/work/fixture/answer-question.json --case /app/work/fixture/case.json --outdir /app/work/preflight
+python "$SKILL_DIR/scripts/literature_qa.py" mirror --result /app/output/result.json --also /app/answers.json
 ```
 
-Illustrative behaviour on that fixture: the contract lists 5 fields and 2 questions, the compliant
+Illustrative behaviour on those fixtures: the contract lists 5 fields and 2 questions, the compliant
 answer passes 11/11 checks, and the deliberately defective answer fails field coverage, the status
 vocabulary, the value-on-unreported rule, the locator rule, quotation fidelity, numeric preservation
-and claim evidence. Those values come from `examples/synthetic_case.py` — an interface fixture, not a
-case result and not a score. See `MAPPING.md`.
+and claim evidence. The question fixture is a 32-paragraph paper with nine questions: the scheduled
+plan finds all nine ids and all 32 paragraph ids, the compliant answer passes every check, and each
+of 13 planted defects is caught - among them a quotation that is not in the text, a `reported` number
+that is not in its own quotation, a fact quoted out of the question text, a paragraph id the case
+does not carry, an omitted question, a gap with no reason, and an unfilled skeleton. Those values
+come from `examples/synthetic_case.py` and `tests/qa_checks.py` - interface fixtures, not case
+results and not scores. See `MAPPING.md`.

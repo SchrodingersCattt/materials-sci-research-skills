@@ -1,6 +1,7 @@
 ---
 name: deep-research-agent
-description: Use when a research question needs a decomposition-and-synthesis pass: split it into answerable sub-questions, answer each from supplied material with a locator, and synthesise with an explicit statement of what remains unknown.
+description: |-
+  Use when a research question needs a decomposition-and-synthesis pass: split it into answerable sub-questions, answer each from supplied material with a locator, and synthesise with an explicit statement of what remains unknown.
 ---
 
 ## Two commands, then the work

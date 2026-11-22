@@ -1,6 +1,7 @@
 ---
 name: frontier-and-trend-analysis
-description: Use when research trends must be read out of a supplied corpus: time-stamped topic clusters, method adoption curves, and emerging-versus-established claims each grounded in specific sources.
+description: |-
+  Use when research trends must be read out of a supplied corpus: time-stamped topic clusters, method adoption curves, and emerging-versus-established claims each grounded in specific sources.
 ---
 
 ## Two commands, then the work

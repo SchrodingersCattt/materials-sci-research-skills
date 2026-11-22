@@ -1,6 +1,7 @@
 ---
 name: source-preserving-academic-polish
-description: Use when academic prose must be improved without changing what it claims: grammar, terminology and register edits that preserve meaning, with a before/after record for every change.
+description: |-
+  Use when academic prose must be improved without changing what it claims: grammar, terminology and register edits that preserve meaning, with a before/after record for every change.
 ---
 
 ## Two commands, then the work

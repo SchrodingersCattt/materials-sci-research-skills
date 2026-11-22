@@ -9,11 +9,13 @@ item by item, and with the manuscript's content left intact.
 | Path | Role |
 |---|---|
 | `SKILL.md` | the instruction the evaluator agent reads first: contract, workflow, failure handling |
-| `scripts/adapt_template.py` | the whole runtime: `inspect`, `specify`, `apply`, `verify`, `preview` |
+| `scripts/adapt_template.py` | the whole runtime: `inspect`, `specify`, `apply`, `verify`, `linkage`, `preview` |
 | `MAPPING.md` | requirement direction → mechanism → verification check |
 | `PROVENANCE.md` | origin, hashes, dependency and boundary statement |
 | `examples/synthetic_case.py` | builds a synthetic template/manuscript DOCX pair for self-testing |
+| `examples/linkage_case.py` | builds a realistic-size manuscript pair with and without planted caption/reference defects |
 | `tests/run_checks.py` | runs the pipeline on that pair and on refusal paths, and prints a verdict |
+| `tests/linkage_checks.py` | the true-positive/true-negative control for the apparatus audit |
 
 ## Requirements
 
@@ -31,23 +33,32 @@ python scripts/adapt_template.py inspect  <file>    --out /app/work/inspect.json
 python scripts/adapt_template.py specify  --template <template.docx> --source <manuscript.docx> --out /app/work/spec.json
 python scripts/adapt_template.py apply    --source <manuscript.docx> --template <template.docx> --spec /app/work/spec.json --outdir /app/work/adapted
 python scripts/adapt_template.py verify   --source <manuscript.docx> --output /app/work/adapted/adapted.docx --spec /app/work/spec.json --outdir /app/work/adapted
+python scripts/adapt_template.py linkage  --source <manuscript.docx> --output /app/work/adapted/adapted.docx --outdir /app/work/adapted
 python scripts/adapt_template.py preview  --docx /app/work/adapted/adapted.docx --outdir /app/work/adapted
 ```
 
 Exit codes: `0` success, `2` refused adaptation (read `reason` in `apply-report.json`),
-`3` verification found failing checks (read `verification.json`). A refusal and a failing
-check are results, not crashes: report them.
+`3` verification found failing checks or the linkage audit found defects (read `verification.json`
+or `linkage-report.json`). A refusal and a failing check are results, not crashes: report them.
 
 ## Self-test
 
 ```
 python examples/synthetic_case.py --outdir /tmp/fixture
 python tests/run_checks.py --workdir /tmp/lab
+python tests/linkage_checks.py --workdir /tmp/lab-linkage
 ```
 
 `tests/run_checks.py` builds the synthetic pair, runs specify/apply/verify, asserts the
 content stream is preserved, asserts every check passes on the fixture, and asserts that a
 non-DOCX template is refused instead of silently guessed.
+
+`tests/linkage_checks.py` builds a manuscript the size of a real one (about forty paragraphs, three
+figures, two tables, an equation and a twelve-entry reference list) in a defective and a clean
+variant, then asserts both controls: the defective one must be reported `needs_work` with the
+planted defects named by kind and locator, and the clean one must be reported `consistent` with no
+defect and no false alarm. It also asserts that a linked `--renumber` leaves no caption out of
+sequence, follows the change into the in-text references, and does not touch the reference list.
 
 ## Scope and limits
 
@@ -55,9 +66,12 @@ non-DOCX template is refused instead of silently guessed.
   definitions to import: the stated rules (page setup, font, size, spacing, caption
   position, reference style) are applied where the format allows, and everything else is
   reported as unchecked.
-- Numbering, cross-reference fields, TOC fields, headers/footers and journal front matter
-  are preserved from the manuscript rather than regenerated; a case that requires the
-  template's own numbering, headers or front matter needs an explicit, recorded decision.
+- Caption numbering, in-text figure/table/equation references, the reference list and field codes
+  are audited on the adapted document (`linkage`), and a caption number can be repaired together
+  with every in-text reference that points at it (`--renumber`). TOC content, header/footer
+  boilerplate and journal front matter are still preserved from the manuscript rather than
+  regenerated; a case that requires the template's own headers, front matter or a rebuilt table of
+  contents needs an explicit, recorded decision.
 - Style roles are inferred from style names, outline levels and template structure. An
   unusual template may need an explicit mapping override, which must be recorded as such.
 - The verification proves geometry, style application, content preservation and package

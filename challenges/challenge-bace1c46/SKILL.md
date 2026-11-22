@@ -1,6 +1,7 @@
 ---
 name: study-quality-appraisal
-description: Use when included studies must be appraised: a stated scale applied dimension by dimension with the supporting position, and the grade carried into the weight a study gets.
+description: |-
+  Use when included studies must be appraised: a stated scale applied dimension by dimension with the supporting position, and the grade carried into the weight a study gets.
 ---
 
 ## Two commands, then the work

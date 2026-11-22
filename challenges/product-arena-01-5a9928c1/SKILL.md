@@ -1,6 +1,7 @@
 ---
 name: terminology-consistent-literature-translation
-description: Use when a scientific paper must be translated while staying verifiable: a glossary pinned across the whole document, paragraph-aligned bilingual output, and citations, formulas and numeric values carried through unchanged.
+description: |-
+  Use when a scientific paper must be translated while staying verifiable: a glossary pinned across the whole document, paragraph-aligned bilingual output, and citations, formulas and numeric values carried through unchanged.
 ---
 
 ## Two commands, then the work

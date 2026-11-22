@@ -1,6 +1,7 @@
 ---
 name: systematic-review-protocol
-description: Use when a systematic review must be executed reproducibly: an explicit search strategy, adjudicable inclusion criteria, two-stage screening records, quality appraisal, and a versioned audit trail.
+description: |-
+  Use when a systematic review must be executed reproducibly: an explicit search strategy, adjudicable inclusion criteria, two-stage screening records, quality appraisal, and a versioned audit trail.
 ---
 
 ## Two commands, then the work

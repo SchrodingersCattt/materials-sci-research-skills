@@ -1,6 +1,7 @@
 ---
 name: topic-selection-and-novelty
-description: Use when a research topic must be justified: the question is placed against supplied prior work, the claimed novelty is checked against it, and feasibility is assessed from the stated constraints.
+description: |-
+  Use when a research topic must be justified: the question is placed against supplied prior work, the claimed novelty is checked against it, and feasibility is assessed from the stated constraints.
 ---
 
 ## Two commands, then the work

@@ -1,6 +1,7 @@
 ---
 name: literature-review-generation
-description: Use when a literature review must be generated from supplied sources: screening criteria written before writing, themes derived from the sources, an evidence table, and a draft whose strength words match the evidence.
+description: |-
+  Use when a literature review must be generated from supplied sources: screening criteria written before writing, themes derived from the sources, an evidence table, and a draft whose strength words match the evidence.
 ---
 
 ## Two commands, then the work

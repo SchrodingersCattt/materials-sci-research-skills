@@ -1,8 +1,8 @@
-# Ecosystem contribution — 阅读02｜科研图表解析
+# Ecosystem contribution — reading engine (question-shaped and field-shaped cases)
 
-Channel: `challenge-f35e4ca5`. The organizer grades documentation completeness, reuse by others,
-and shareable experience. This file is the map; the inventory below is generated from the
-actual directory contents.
+The organizer grades documentation completeness, reuse by others, and shareable experience. This file
+is the map; the inventory below is generated from the actual directory contents. The engine is shared
+by the reading channels, so it is described channel-neutrally.
 
 ## Documentation completeness
 
@@ -10,7 +10,7 @@ actual directory contents.
 |---|---|
 | usage instructions | `README.md` (Use), `SKILL.md` (Workflow) |
 | dependencies and configuration | `README.md` (Requirements), `PROVENANCE.md` |
-| examples | `examples/synthetic_case.py`, `tests/cases/` |
+| examples | `examples/synthetic_case.py`, `tests/cases/`, `tests/qa_checks.py` |
 | applicable scope and limits | `SKILL.md` (Scope), `README.md` (Scope and limits) |
 | length and size limits | `README.md`, and the run's own budget note in `SKILL.md` |
 | known failure modes | `SKILL.md` (Failure handling), `CHECKLIST.md` |

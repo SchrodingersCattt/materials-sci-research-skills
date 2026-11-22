@@ -64,6 +64,20 @@ set whose expected answers you cannot point at, and do not report a score you ca
 - A benchmark you author must be **runnable by someone else**: every case carries its material
   locator, its expected-answer contract and its scoring anchors, and the score is computed by a
   declared rule rather than by an impression.
+- **An anchor must be earned by an answer, not by the answer's shape.** Anchors are matched by
+  normalised substring, and the match runs inside the individual answer **values** — never against a
+  serialised copy of the answer object, whose key names and envelope would then score the case. This
+  is checked here rather than remembered: `tests/bench_score_checks.py` plants a needle that occurs
+  only as a key, and the scorer must report that anchor missing while still awarding the anchor that
+  the answer really states.
+- **A set that does not validate is not scored.** `score` revalidates the spec and refuses to produce
+  a score for an invalid set, so a broken benchmark fails loudly instead of yielding a number that
+  looks like a result. `min_cases` counts cases, not distinct `kind` values: two cases of the same
+  kind satisfy a two-case requirement.
+- The organizer's revision 2 for this channel supplies a four-item **source-conditioned
+  benchmark-DRAFT workorder**; the provided sources are paragraph and table text, not PDF-pixel gold,
+  and the technical synthetic checker logs are not DSH scores or independent semantic validation. Say
+  which of those you used and what you did not verify.
 - Contract conformance: after the deliverables and `result.json` exist, run
   `python "$SKILL_DIR/scripts/contract_check.py" verify --case /input/case.json --task /input/task.md --outdir /app/work/conformance`
   and repair every failed check before finishing; `conform --contract ... --output /app/output`
@@ -217,6 +231,7 @@ partially guessed.
 | `CHANGELOG.md` | versioning and maintenance policy |
 | `templates/` | glossary, reference map, change log, deliverable plan and pointer templates |
 | `tests/cases/` | reusable interface items with structural expectations |
+| `tests/bench_score_checks.py` | the scorer controls: a needle that occurs only as a key must not be awarded, an answered anchor must be, and an invalid set must not be scored |
 
 These are submission materials, not case answers: no organizer case, whiteboard or formal result is
 included anywhere in this bundle.

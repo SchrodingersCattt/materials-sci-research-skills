@@ -1,6 +1,7 @@
 ---
 name: argument-and-logic-review
-description: Use when a paper's reasoning must be reviewed: extracted claims with their qualifiers, evidence sufficiency, gaps in the inference chain, and cross-section agreement between what is promised and what is delivered.
+description: |-
+  Use when a paper's reasoning must be reviewed: extracted claims with their qualifiers, evidence sufficiency, gaps in the inference chain, and cross-section agreement between what is promised and what is delivered.
 ---
 
 ## Two commands, then the work

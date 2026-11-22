@@ -1,6 +1,7 @@
 ---
 name: evidence-bound-knowledge-graph
-description: Use when a paper must be turned into a knowledge graph of entities and relations tied to evidence: alias normalisation, relation extraction with a provenance edge, graph export and basic query.
+description: |-
+  Use when a paper must be turned into a knowledge graph of entities and relations tied to evidence: alias normalisation, relation extraction with a provenance edge, graph export and basic query.
 ---
 
 ## Two commands, then the work

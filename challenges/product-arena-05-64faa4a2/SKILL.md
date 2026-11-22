@@ -1,6 +1,7 @@
 ---
 name: methods-and-experimental-sections
-description: Use when methods and experimental sections must be written for reproducibility: ordered steps, parameters, datasets, controls, and explicit limitations.
+description: |-
+  Use when methods and experimental sections must be written for reproducibility: ordered steps, parameters, datasets, controls, and explicit limitations.
 ---
 
 ## Two commands, then the work
