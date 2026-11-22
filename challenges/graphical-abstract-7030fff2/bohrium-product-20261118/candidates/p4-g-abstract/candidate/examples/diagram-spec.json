@@ -1,0 +1,75 @@
+{
+ "title": "Interface example (not a case result)",
+ "caption": "Interface example only. Every element carries the locator it was read at.",
+ "width": 960,
+ "height": 560,
+ "default_position": "process",
+ "legend": {
+  "process": "process step",
+  "result": "reported result"
+ },
+ "nodes": [
+  {
+   "id": "n1",
+   "label": "question",
+   "position": "process",
+   "x": 40,
+   "y": 80,
+   "w": 180,
+   "h": 62,
+   "source": "examples/chart-data.csv",
+   "locator": "row 1, condition column"
+  },
+  {
+   "id": "n2",
+   "label": "method",
+   "position": "process",
+   "x": 300,
+   "y": 80,
+   "w": 180,
+   "h": 62,
+   "source": "examples/chart-data.csv",
+   "locator": "row 1"
+  },
+  {
+   "id": "n3",
+   "label": "core result",
+   "position": "result",
+   "x": 560,
+   "y": 80,
+   "w": 180,
+   "h": 62,
+   "detail": "1.6 a.u.",
+   "source": "examples/chart-data.csv",
+   "locator": "row 2, value column"
+  },
+  {
+   "id": "n4",
+   "label": "conclusion",
+   "position": "result",
+   "x": 560,
+   "y": 300,
+   "w": 180,
+   "h": 62,
+   "source": "examples/diagram-spec.json",
+   "locator": "this file"
+  }
+ ],
+ "edges": [
+  {
+   "from": "n1",
+   "to": "n2",
+   "label": "addressed by"
+  },
+  {
+   "from": "n2",
+   "to": "n3",
+   "label": "produces"
+  },
+  {
+   "from": "n3",
+   "to": "n4",
+   "label": "supports"
+  }
+ ]
+}

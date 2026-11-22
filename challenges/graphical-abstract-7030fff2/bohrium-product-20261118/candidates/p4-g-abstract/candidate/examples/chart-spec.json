@@ -1,0 +1,18 @@
+{
+ "kind": "bar",
+ "data": "examples/chart-data.csv",
+ "x": "condition",
+ "value": "value",
+ "value_note": "interface example only: replace with the value the material reports",
+ "unit": "a.u.",
+ "title": "Interface example (not a case result)",
+ "x_label": "condition",
+ "y_label": "reported value (a.u.)",
+ "error_low": "err_low",
+ "error_high": "err_high",
+ "error_meaning": "interface example: replace with what the material says the interval means",
+ "source": "examples/chart-data.csv",
+ "note": "Interface example, not a case answer.",
+ "width": 900,
+ "height": 560
+}
