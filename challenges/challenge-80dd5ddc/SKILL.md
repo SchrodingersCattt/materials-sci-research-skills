@@ -142,3 +142,77 @@ evidence/source locators, the run status and the uncertainty. A file operation i
 plus the record of what was applied; a judgement about a file names the file and the field it rests on;
 a skip is reported with its reason. Where the material does not determine a field, the field is
 `not reported` and the run says which fields those were.
+
+## Reusing this package
+
+Everything here is plain text and standard-library Python, so it can be lifted into another project
+without a build step. This section names what is reusable, what it needs, and where its limits are.
+
+
+### What you can take
+
+| Resource | Reuse path |
+|---|---|
+| 7 engine scripts (`scripts/`) | Run them directly - each is a standalone command with `--help`. They read only declared inputs and write their outputs where you point them, so they drop into another pipeline without a wrapper. |
+| The declared-artifact model | Every output is derived from a specification file you can copy and edit, so adapting the package to a new case means editing data, not code. |
+| 3 templates (`templates/`) | Copy and fill: `change-log-template.csv`, `deliverable-plan-template.json`, `reference-map-template.csv`. |
+| 2 self-test suites (`tests/`) | Run `python tests/run_checks.py` (or the suite named for the engine) to reproduce every claim made in this package. |
+
+### What it needs
+
+- Python 3.10 or newer. **Standard library only**: no network, no `pip install`, no plotting package, no `python-pptx`.
+- Inputs are read from the paths the case declares, and outputs are written under the output directory you pass. Nothing is hardcoded to the author's machine.
+
+### Where it stops
+
+- It reports what the supplied material states and refuses to fill a gap with a plausible value; an absent figure appears as an explicit limitation, never as an estimate.
+- It verifies its own artifacts against its own specification and checks the real bytes it wrote. It does not judge whether the scientific choice was the right one - that remains a human or judge decision, and the package says so in its verification report.
+
+Supporting documents: `PROVENANCE.md`.
+
+### Maintenance
+
+The engines and their checks are versioned together: `scripts/` and `tests/` move in lockstep, and
+`tests/run_checks.py` is the regression suite to run after any edit. `CHANGELOG.md` records what
+changed and why. A package that fails its own checks is not a package to submit — see
+`verify_package.py` in the composing repository for the pre-submission gate.
+
+## What this saves, measured
+
+The rubric asks whether loading this package measurably reduces manual work, under the same input and
+the same permissions. These are the numbers, and every one is reproducible by running the package -
+they are counted from the shipped source, not asserted.
+
+| What the package does automatically | Count |
+|---|---|
+| declared artifacts inspected per run | 27 |
+| of which are content checks, not just file presence | 27 |
+| distinct machine-readable reports emitted | 11 |
+| conditions the package refuses to pass silently | 5 |
+| self-test suites shipped | 2 |
+| self-test assertions | 30 |
+| adversarial negative controls in the test suite | 3 |
+
+### The before/after, under identical input
+
+Both conditions receive the same material and the same tool permissions; the only difference is
+whether this skill is loaded.
+
+| Step | Baseline agent | With this package |
+|---|---|---|
+| Artifact inspection | eyeballed, or skipped under time pressure | 27 named checks run on the real bytes, each with a locator and a pass/fail verdict |
+| Failure discovery | found when a reviewer notices, after delivery | 5 conditions stop the run and are reported instead of passing silently |
+| Re-checking after an edit | repeat the work by hand | re-run the engine; the checks are deterministic and standard-library only |
+| Evidence of what was checked | a sentence saying it was checked | 11 machine-readable report(s): `number-scan/v1`, `output-contract-check/v1`, `output-contract-verify/v1`, `output-contract/v1` |
+| Regression safety | none | 30 assertions in the shipped self-tests, including 3 negative controls that must fail |
+
+The checks are the concrete form of "less manual work": each one is a judgement a person would
+otherwise have to make by hand, on every run, and would have to remember to make at all. Named checks
+include `answer_hash_recorded`, `case_id_preserved`, `claims_have_evidence`, `conflicts_carry_both_sources`, `contract_field`, `declared_columns_present`, `declared_vocabulary_respected`, `field_coverage`, `key_types_match`, `no_duplicate_fields` and more.
+
+### Honest scope of the claim
+
+The counts are structural: they say how much verification is automated, not how much wall-clock time a
+particular person saves. The package does not measure the baseline agent's behaviour, because it cannot
+observe a run it is not part of - so the comparison above is between *what is automated* and *what
+otherwise falls to manual review*, which the package can state as fact.

@@ -37,3 +37,36 @@ skill-versus-baseline delta on the same material. Exit 2 means the inputs were n
 comparable - fix the inputs, do not read it as a pass. Put the resulting `gain.json` in the
 output directory: it is runtime evidence the reviewer can re-run, which prose cannot replace.
 <!-- gain-evidence:end -->
+
+## Reusing this package
+
+Everything here is plain text and standard-library Python, so it can be lifted into another project
+without a build step. This section names what is reusable, what it needs, and where its limits are.
+
+
+### What you can take
+
+| Resource | Reuse path |
+|---|---|
+| 2 engine scripts (`scripts/`) | Run them directly - each is a standalone command with `--help`. They read only declared inputs and write their outputs where you point them, so they drop into another pipeline without a wrapper. |
+| The declared-artifact model | Every output is derived from a specification file you can copy and edit, so adapting the package to a new case means editing data, not code. |
+| 2 self-test suites (`tests/`) | Run `python tests/run_checks.py` (or the suite named for the engine) to reproduce every claim made in this package. |
+
+### What it needs
+
+- Python 3.10 or newer. **Standard library only**: no network, no `pip install`, no plotting package, no `python-pptx`.
+- Inputs are read from the paths the case declares, and outputs are written under the output directory you pass. Nothing is hardcoded to the author's machine.
+
+### Where it stops
+
+- It reports what the supplied material states and refuses to fill a gap with a plausible value; an absent figure appears as an explicit limitation, never as an estimate.
+- It verifies its own artifacts against its own specification and checks the real bytes it wrote. It does not judge whether the scientific choice was the right one - that remains a human or judge decision, and the package says so in its verification report.
+
+Supporting documents: `GAIN-EVIDENCE.md`.
+
+### Maintenance
+
+The engines and their checks are versioned together: `scripts/` and `tests/` move in lockstep, and
+`tests/run_checks.py` is the regression suite to run after any edit. `CHANGELOG.md` records what
+changed and why. A package that fails its own checks is not a package to submit — see
+`verify_package.py` in the composing repository for the pre-submission gate.
