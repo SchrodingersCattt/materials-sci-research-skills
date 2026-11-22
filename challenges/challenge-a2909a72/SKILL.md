@@ -178,7 +178,7 @@ without a build step. This section names what is reusable, what it needs, and wh
 | 6 engine scripts (`scripts/`) | Run them directly - each is a standalone command with `--help`. They read only declared inputs and write their outputs where you point them, so they drop into another pipeline without a wrapper. |
 | The declared-artifact model | Every output is derived from a specification file you can copy and edit, so adapting the package to a new case means editing data, not code. |
 | 3 templates (`templates/`) | Copy and fill: `change-log-template.csv`, `deliverable-plan-template.json`, `reference-map-template.csv`. |
-| 6 self-test suites (`tests/`) | Run `python tests/run_checks.py` (or the suite named for the engine) to reproduce every claim made in this package. |
+| 6 self-test suites (`tests/`) | Run them to reproduce every claim made in this package: `analysis_checks.py`, `file_inventory_checks.py`, `gain_checks.py`, `protocol_audit_checks.py`, `retrieval_checks.py` and more. |
 
 ### What it needs
 
@@ -194,11 +194,10 @@ Supporting documents: `PROVENANCE.md`.
 
 ### Maintenance
 
-The engines and their checks are versioned together: `scripts/` and `tests/` move in lockstep, and
-`tests/run_checks.py` is the regression suite to run after any edit. `CHANGELOG.md` records what
-changed and why. A package that fails its own checks is not a package to submit — see
-`verify_package.py` in the composing repository for the pre-submission gate.
-
+The engines and their checks are versioned together: `scripts/` and `tests/` move in lockstep, and the
+suites named above are the regression tests to run after any edit. `CHANGELOG.md` records what changed
+and why. A package that fails its own checks is not a package to submit - the composing repository's
+`verify_package.py` is the pre-submission gate.
 ## What this saves, measured
 
 The rubric asks whether loading this package measurably reduces manual work, under the same input and

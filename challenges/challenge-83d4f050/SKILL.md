@@ -115,7 +115,7 @@ python "$SKILL_DIR/scripts/make_figure.py" verify --prefix /app/output/figure1 -
 
 ## The editable source is part of the deliverable
 
-This channel's statement counts **?????? (a layered editable source)** as one of the six
+This channel's statement counts **可编辑源文件 (a layered editable source)** as one of the six
 elements a figure must cover, alongside the export. So each build writes five files, and all five go
 to `/app/output`:
 
@@ -125,10 +125,10 @@ to `/app/output`:
 | `<name>.png` | the raster export, inspected for clipping and blank ink |
 | `<name>.pdf` | the print export |
 | `<name>.drawio` | **the layered source**: every element addressable by id with its geometry, opened by draw.io / diagrams.net |
-| `<name>.provenance.csv` | element id to source file and locator, for the ??????? requirement |
+| `<name>.provenance.csv` | element id to source file and locator, for the 结果可核验性 requirement |
 
 `make_figure.py` writes the `.drawio` and `.provenance.csv` automatically. Do not deliver only the
-PNG: the export alone fails ?????, because the reviewer cannot reopen and move anything.
+PNG: the export alone fails 可编辑性, because the reviewer cannot reopen and move anything.
 
 ## Numbers are checked automatically, not by hand
 
@@ -136,7 +136,7 @@ PNG: the export alone fails ?????, because the reviewer cannot reopen and move a
 reads every numeric value in the supplied data, and classifies each prose number as a declared value,
 a declared two-value calculation, or undeclared. Undeclared numbers come back in the report's
 `undeclared_numbers` list and make the run exit non-zero - that list is the traceability defect list
-for the rubric's ?????? sub-point, so repair it before finishing. Add `--data <dir>` if the
+for the rubric's 结果可核验性 sub-point, so repair it before finishing. Add `--data <dir>` if the
 supplied data is not under `/input`.
 
 ## Leave an evidence trail
@@ -259,7 +259,7 @@ without a build step. This section names what is reusable, what it needs, and wh
 | 5 engine scripts (`scripts/`) | Run them directly - each is a standalone command with `--help`. They read only declared inputs and write their outputs where you point them, so they drop into another pipeline without a wrapper. |
 | The declared-artifact model | Every output is derived from a specification file you can copy and edit, so adapting the package to a new case means editing data, not code. |
 | 7 templates (`templates/`) | Copy and fill: `change-log-template.csv`, `deliverable-plan-template.json`, `figure-check-item.md`, `figure-manifest.csv`, `figure-table-pointer-template.csv`, `glossary-template.csv` and more. |
-| 2 self-test suites (`tests/`) | Run `python tests/run_checks.py` (or the suite named for the engine) to reproduce every claim made in this package. |
+| 2 self-test suites (`tests/`) | Run them to reproduce every claim made in this package: `gain_checks.py`, `run_checks.py`. |
 | Worked fixtures (`examples/`) | `synthetic_case.py` - realistic shapes you can run end to end before touching real material. |
 | Test cases (`tests/cases/`) | 4 declared cases you can extend with your own. |
 
@@ -278,11 +278,10 @@ Supporting documents: `CHANGELOG.md`, `CHECKLIST.md`, `ECOSYSTEM.md`, `GAIN-EVID
 
 ### Maintenance
 
-The engines and their checks are versioned together: `scripts/` and `tests/` move in lockstep, and
-`tests/run_checks.py` is the regression suite to run after any edit. `CHANGELOG.md` records what
-changed and why. A package that fails its own checks is not a package to submit — see
-`verify_package.py` in the composing repository for the pre-submission gate.
-
+The engines and their checks are versioned together: `scripts/` and `tests/` move in lockstep, and the
+suites named above are the regression tests to run after any edit. `CHANGELOG.md` records what changed
+and why. A package that fails its own checks is not a package to submit - the composing repository's
+`verify_package.py` is the pre-submission gate.
 ## What this saves, measured
 
 The rubric asks whether loading this package measurably reduces manual work, under the same input and

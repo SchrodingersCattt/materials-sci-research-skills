@@ -794,7 +794,7 @@ def _esc(value) -> str:
 def write_drawio(spec: dict, out_path: Path, kind: str) -> None:
     """A layered, editable source in the mxGraph format draw.io / diagrams.net opens.
 
-    The rubric names "??????" (a layered source) as one of the six elements a figure must
+    The rubric names "可编辑源文件" (a layered source) as one of the six elements a figure must
     cover, so the export alone is not enough: this keeps every element addressable by id, with its
     geometry, its layer and its declared source, so a human can reopen and move things.
     """
