@@ -83,7 +83,6 @@ differ, which is exactly why the example is included: it proves the interface wo
 The synthetic material's absent catalyst loading exists so the example shows the honest path: the
 deliverable must say "not reported", and the audit fails the run if a number appears that the material
 never stated.
-
 ## Reusing this package
 
 Everything here is plain text and standard-library Python, so it can be lifted into another project

@@ -3,14 +3,20 @@
   "title": "Synthetic interface example (not a formal case)",
   "output_contract": {
     "summary": "string",
-    "key_findings": "list[string]",
-    "evidence_map": "list[{claim,source_file,locator}]",
-    "limitations": "list[string]",
-    "confidence": [
-      "low",
-      "medium",
-      "high"
-    ]
+    "key_findings": [
+      "string"
+    ],
+    "evidence_map": [
+      {
+        "claim": "string",
+        "source_file": "string",
+        "locator": "string"
+      }
+    ],
+    "limitations": [
+      "string"
+    ],
+    "confidence": "low|medium|high"
   },
   "deliverables": [
     "findings.csv"
