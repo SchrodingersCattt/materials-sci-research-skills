@@ -144,6 +144,49 @@ Run python tests/test_v2.py, and tests/run_checks.py --workdir /app/work/slide-t
 Version 2 resolves target_slide through presentation.xml order, recognizes centered-title and subtitle placeholders, instantiates unused supplied layouts, and refuses unknown named layouts. Original master/layout/theme bytes remain untouched. New pages created from layouts copy text placeholders, not unrelated sample content or arbitrary graphics. Existing figures remain intact in copied slides; adding/replacing figures or real speaker notes is not implemented by this helper. Use installed presentation tools for those required operations and verify the resulting relationships. Never claim a figure or notes were added merely because text was written.
 Package checks and overflow estimates are not rendering. Render and inspect real output when a renderer exists; if absent, state that visual verification was not performed. No score gain is claimed from synthetic regression tests.
 
+## Minimal call example (synthetic - interface only, not an answer)
+
+Row 4 of the organizer's delivery table asks for at least one set of inputs, the invocation, and a
+sample output marked as an example. Everything below is **synthetic**: the case id is
+`SYNTHETIC-EXAMPLE-0001`, the material invents two rows and deliberately leaves one value
+absent, and the transcript under it is the **real captured output** of running these commands in this
+package. It demonstrates the interface; it is not an answer to any case, and it is not a score.
+
+### The inputs (`examples/`)
+
+| File | What it is |
+|---|---|
+| `examples/case.json` | a synthetic case; its output contract declares `confidence`, `evidence_map`, `key_findings`, `limitations`, `summary`, plus the deliverable `findings.csv` |
+| `examples/task.md` | the synthetic task text |
+| `examples/material/synthetic-material.md` | invented material whose catalyst loading is genuinely absent |
+
+### The invocation
+
+```bash
+python "$SKILL_DIR/scripts/contract_check.py" extract --case "$SKILL_DIR/examples/case.json" --task "$SKILL_DIR/examples/task.md" --out D:/DP_Internship/AIagents/AgentDev/agent-internal-challenge/bohrium-product-20261118/build/_tmp/tmph0el52t_/example/work/contract.json
+python "$SKILL_DIR/scripts/contract_check.py" skeleton --contract D:/DP_Internship/AIagents/AgentDev/agent-internal-challenge/bohrium-product-20261118/build/_tmp/tmph0el52t_/example/work/contract.json --out D:/DP_Internship/AIagents/AgentDev/agent-internal-challenge/bohrium-product-20261118/build/_tmp/tmph0el52t_/example/work/result-skeleton.json
+# ... read examples/material/, write the deliverable and work/result.json ...
+```
+
+### Sample output (real transcript from these commands)
+
+Paths in the transcript are written `<WORKDIR>` because they differ on every machine; everything else
+is exactly what the commands printed.
+
+| Command | Exit | Output |
+|---|---|---|
+| `contract_check.py extract` | 0 | `{"keys": 5, "files": 0, "columns": 0, "checklist": 7}` |
+| `contract_check.py skeleton` | 0 | `{"keys": ["case_id", "confidence", "evidence_map", "key_findings", "limitations", "summary"]}` |
+
+Each command below is one this package actually ships; the transcript under it was produced by running exactly these lines against `examples/`.
+`extract` reports how many contract keys, files and columns it found; `skeleton` lists the keys the
+result must carry, including `case_id`; `plan` writes the checklist and names what to do next. On a real
+case the same commands run against `/input/case.json` and `/input/task.md` unchanged - only the paths
+differ, which is exactly why the example is included: it proves the interface works end to end.
+
+The synthetic material's absent catalyst loading exists so the example shows the honest path: the
+deliverable must say "not reported", and the audit fails the run if a number appears that the material
+never stated.
 ## Reusing this package
 
 Everything here is plain text and standard-library Python, so it can be lifted into another project

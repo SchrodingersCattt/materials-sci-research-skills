@@ -1,0 +1,18 @@
+{
+  "case_id": "SYNTHETIC-EXAMPLE-0001",
+  "title": "Synthetic interface example (not a formal case)",
+  "output_contract": {
+    "summary": "string",
+    "key_findings": "list[string]",
+    "evidence_map": "list[{claim,source_file,locator}]",
+    "limitations": "list[string]",
+    "confidence": [
+      "low",
+      "medium",
+      "high"
+    ]
+  },
+  "deliverables": [
+    "findings.csv"
+  ]
+}
