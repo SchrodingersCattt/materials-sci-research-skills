@@ -38,6 +38,52 @@ comparable - fix the inputs, do not read it as a pass. Put the resulting `gain.j
 output directory: it is runtime evidence the reviewer can re-run, which prose cannot replace.
 <!-- gain-evidence:end -->
 
+## Minimal call example (synthetic - interface only, not an answer)
+
+Row 4 of the organizer's delivery table asks for at least one set of inputs, the invocation, and a
+sample output marked as an example. Everything below is **synthetic**: the case id is
+`SYNTHETIC-EXAMPLE-0001`, the material invents two rows and deliberately leaves one value
+absent, and the transcript under it is the **real captured output** of running these commands in this
+package. It demonstrates the interface; it is not an answer to any case, and it is not a score.
+
+### The inputs (`examples/`)
+
+| File | What it is |
+|---|---|
+| `examples/case.json` | a synthetic input you can point the tool at |
+| `examples/task.md` | a synthetic input you can point the tool at |
+| `examples/material/synthetic-material.md` | a synthetic input you can point the tool at |
+
+
+### The invocation
+
+```bash
+python "$SKILL_DIR/scripts/gain_check.py" --help
+python "$SKILL_DIR/scripts/render_sections.py" --help
+python "$SKILL_DIR/scripts/test_matrix.py" --help
+```
+
+### Sample output (real transcript from these commands)
+
+Paths in the transcript are written `<WORKDIR>` because they differ on every machine; everything else
+is exactly what the commands printed.
+
+| Command | Exit | Output |
+|---|---|---|
+| `gain_check.py --help` | 0 | `{"interface": "usage: gain_check.py [-h] --source SOURCE --answer ANSWER\n                     [--baseline BASELINE] --out OUT\n\noption<WORKDIR>"}` |
+| `render_sections.py --help` | 0 | `{"interface": "usage: render_sections.py [-h] --section SECTION --outdir OUTDIR [--font FONT]\n                          [--budget-seconds BUDGET_SECONDS]\n\noption<WORKDIR>"}` |
+| `test_matrix.py --help` | 0 | `{"interface": "usage: test_matrix.py [-h] [-v] [-q] [--locals] [--durations N] [-f] [-c] [-b]\n                      [-k TESTNAMEPATTERNS]\n                      [tests ...]\n\npositional argument<WORKDIR>"}` |
+
+This package is a single tool rather than a staged runner, so its interface is the tool's own command line. `--help` for each script is captured below, and `examples/` holds synthetic inputs to point them at.
+`extract` reports how many contract keys, files and columns it found; `skeleton` lists the keys the
+result must carry, including `case_id`; `plan` writes the checklist and names what to do next. On a real
+case the same commands run against `/input/case.json` and `/input/task.md` unchanged - only the paths
+differ, which is exactly why the example is included: it proves the interface works end to end.
+
+The synthetic material's absent catalyst loading exists so the example shows the honest path: the
+deliverable must say "not reported", and the audit fails the run if a number appears that the material
+never stated.
+
 ## Reusing this package
 
 Everything here is plain text and standard-library Python, so it can be lifted into another project
