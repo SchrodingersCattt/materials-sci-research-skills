@@ -187,6 +187,7 @@ without a build step. This section names what is reusable, what it needs, and wh
 | The declared-artifact model | Every output is derived from a specification file you can copy and edit, so adapting the package to a new case means editing data, not code. |
 | 3 templates (`templates/`) | Copy and fill: `change-log-template.csv`, `deliverable-plan-template.json`, `reference-map-template.csv`. |
 | 5 self-test suites (`tests/`) | Run them to reproduce every claim made in this package: `analysis_checks.py`, `file_inventory_checks.py`, `gain_checks.py`, `protocol_audit_checks.py`, `retrieval_checks.py`. |
+| Worked fixtures (`examples/`) | `README.md`, `case.json`, `material`, `task.md` - realistic shapes you can run end to end before touching real material. |
 
 ### What it needs
 

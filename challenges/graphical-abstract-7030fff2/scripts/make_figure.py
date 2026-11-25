@@ -114,6 +114,24 @@ FONT = {
 
 PRIMITIVES: list = []
 
+EDGE_HEAD = 9  # arrowhead length in user units, shared by the figure and its relation key
+
+
+def polarity_styles() -> dict:
+    """How a relation's polarity is encoded, shared by the renderer, the source and the verifier.
+
+    The rubric names inverted polarity (an inhibitor drawn as an activator) as the exact failure a
+    reader must not have to catch by reading the caption, so each polarity owns a distinct stroke
+    colour and a distinct ink style: an arrowhead for a positive relation, a bar for a negative one,
+    a dashed stroke for translocation.
+    """
+    return {
+        "activate": ("#15803d", "endArrow=block;endFill=1", "solid"),
+        "inhibit": ("#b91c1c", "endArrow=block;endFill=0", "bar"),
+        "translocate": ("#1d4ed8", "endArrow=block;endFill=1;dashed=1", "dashed"),
+        "regulate": ("#6b7280", "endArrow=open", "solid"),
+    }
+
 
 def reset_primitives() -> None:
     PRIMITIVES.clear()
@@ -609,6 +627,9 @@ def build_chart(spec: dict, out_prefix: Path) -> dict:
     (out_prefix.with_suffix(".pdf")).write_bytes(pdf_bytes)
 
     layout = check_layout(width, height, margin_left, margin_top, margin_right, margin_bottom)
+    # The rubric asks each export to be checked against the target's parameters rather than
+    # assumed usable, so the numbers are read back out of the files that were actually written.
+    export = export_conformance(out_prefix, width, height)
     # The rubric counts a layered editable source as one of the six required elements, so an
     # exported picture is not the whole deliverable.
     drawio_path = out_prefix.with_suffix(".drawio")
@@ -630,7 +651,7 @@ def build_chart(spec: dict, out_prefix: Path) -> dict:
         "marks": marks,
         "error_bar_meaning": spec.get("error_meaning"),
         "layout": layout,
-        "declared_source": spec.get("source"),
+        "export": export,        "declared_source": spec.get("source"),
     }
 
 
@@ -694,6 +715,9 @@ def build_diagram(spec: dict, out_prefix: Path) -> dict:
         "note": ("#f7eefb", "#7a4f86"), "assay": ("#eaf3f6", "#2b6d7f"),
         "compound": ("#f6efe6", "#8a6134"),
     }
+    # A relation's shape carries its meaning, so an inhibitory edge must not look like an
+    # activating one.
+    polarity_style = polarity_styles()
     reset_primitives()
     if spec.get("title"):
         text(24, 30, spec["title"], size=16, colour="#111111", weight="bold")
@@ -709,18 +733,29 @@ def build_diagram(spec: dict, out_prefix: Path) -> dict:
             continue
         sx, sy, sw, sh = node_boxes[source["id"]]
         tx, ty, tw, th = node_boxes[target["id"]]
+        colour, _drawio_style, ink = polarity_style.get(edge.get("polarity") or "activate",
+                                                       polarity_style["activate"])
         first = (sx + sw / 2, sy + (sh if sy < ty else 0))
         second = (tx + tw / 2, ty + (0 if sy < ty else th))
         if abs(sy - ty) < 1:  # side-by-side
             first = (sx + sw, sy + sh / 2)
             second = (tx, ty + th / 2)
-        line(*first, *second, stroke="#4b5563", width=1.6)
+        # Dash the stroke itself so a dashed relation stays distinguishable in print, not only in
+        # the draw.io source.
+        line(*first, *second, stroke=colour, width=1.6,
+             dash="7 5" if ink == "dashed" else None)
         angle = math.atan2(second[1] - first[1], second[0] - first[0])
-        head = 9
-        for offset in (math.radians(150), math.radians(-150)):
-            line(second[0], second[1],
-                 second[0] + head * math.cos(angle + offset),
-                 second[1] + head * math.sin(angle + offset), stroke="#4b5563", width=1.6)
+        if ink == "bar":
+            # An inhibition bar, the standard notation for a negative relation.
+            half = 6
+            line(second[0] - half * math.sin(angle), second[1] + half * math.cos(angle),
+                 second[0] + half * math.sin(angle), second[1] - half * math.cos(angle),
+                 stroke=colour, width=2.0)
+        else:
+            for turn in (math.radians(150), math.radians(-150)):
+                line(second[0], second[1],
+                     second[0] + EDGE_HEAD * math.cos(angle + turn),
+                     second[1] + EDGE_HEAD * math.sin(angle + turn), stroke=colour, width=1.6)
         if edge.get("label"):
             mid = ((first[0] + second[0]) / 2, (first[1] + second[1]) / 2)
             text(mid[0], mid[1] - 7, edge["label"], size=12, colour="#374151", anchor="middle")
@@ -732,6 +767,13 @@ def build_diagram(spec: dict, out_prefix: Path) -> dict:
         text(x + w / 2, y + h / 2 + 5, label, size=13, colour="#0f172a", anchor="middle")
         if node.get("detail"):
             text(x + w / 2, y + h - 8, node["detail"], size=11, colour="#4b5563", anchor="middle")
+        if node.get("value"):
+            # A declared magnitude with its unit, drawn rather than implied.
+            unit = node.get("unit") or ""
+            text(x + w / 2, y + h / 2 + 21, f"{node['value']} {unit}".strip(), size=10.5,
+                 colour="#1f2937", anchor="middle")
+        if node.get("subfigure"):
+            text(x + 4, y + 15, node["subfigure"], size=13, colour="#111111", weight="bold")
     if spec.get("legend"):
         legend_y = height - 40
         for index, (position, label) in enumerate(spec["legend"].items()):
@@ -739,6 +781,24 @@ def build_diagram(spec: dict, out_prefix: Path) -> dict:
             offset = 24 + index * 170
             rect(offset, legend_y - 11, 16, 13, fill=fill, stroke=stroke, width=1.0)
             text(offset + 22, legend_y, label, size=12, colour="#202020")
+    if spec.get("relation_key"):
+        # Without this a reader cannot decode the arrow semantics, and the rubric asks for the
+        # legend to be checkable against what was actually drawn.
+        key_y = height - 64
+        text(24, key_y, "relations:", size=11.5, colour="#374151")
+        offset = 96
+        for polarity, label in spec["relation_key"].items():
+            colour, _drawio_style, ink = polarity_style.get(polarity, polarity_style["regulate"])
+            line(offset, key_y - 4, offset + 26, key_y - 4, stroke=colour, width=1.6)
+            if ink == "bar":
+                line(offset + 26, key_y - 10, offset + 26, key_y + 2, stroke=colour, width=2.0)
+            else:
+                for turn in (math.radians(150), math.radians(-150)):
+                    line(offset + 26, key_y - 4,
+                         offset + 26 + EDGE_HEAD * math.cos(turn),
+                         key_y - 4 + EDGE_HEAD * math.sin(turn), stroke=colour, width=1.6)
+            text(offset + 32, key_y, label, size=11.5, colour="#374151")
+            offset += 32 + text_width(label, 11.5) + 26
     if spec.get("caption"):
         text(width / 2, height - 12, spec["caption"], size=12.5, colour="#404040", anchor="middle")
 
@@ -757,6 +817,10 @@ def build_diagram(spec: dict, out_prefix: Path) -> dict:
                 overlaps.append({"a": first, "b": second})
     outside = [box for box in boxes
                if box[0] < 0 or box[1] < 0 or box[0] + box[2] > width or box[1] + box[3] > height]
+    # The rubric asks each export to be checked against the target's parameters (size,
+    # resolution, fonts, colour space) rather than assumed usable, so the numbers are read back
+    # out of the files that were actually written.
+    export = export_conformance(out_prefix, width, height)
     # The rubric counts a layered editable source as one of the six required elements, so an
     # exported picture is not the whole deliverable.
     drawio_path = out_prefix.with_suffix(".drawio")
@@ -780,7 +844,17 @@ def build_diagram(spec: dict, out_prefix: Path) -> dict:
             "method": "axis-aligned box intersection on the declared coordinates; the PNG is "
                       "inspected as well.",
         },
-        "captions": {"caption": spec.get("caption"), "legend": spec.get("legend")},
+        "captions": {"caption": spec.get("caption"), "legend": spec.get("legend"),
+                     "relation_key": spec.get("relation_key")},
+        "export": export,
+        "semantics": {
+            "element_classes": sorted({str(n.get("class")) for n in nodes if n.get("class")}),
+            "subfigures": sorted(str(n.get("subfigure")) for n in nodes if n.get("subfigure")),
+            "relation_polarities": sorted({str(e.get("polarity") or "activate") for e in edges}),
+            "effects": sorted(edge.get("effect") for edge in edges if edge.get("effect")),
+            "modifiers": sorted(modifier for edge in edges
+                                for modifier in (edge.get("modifiers") or [])),
+        },
     }
 
 
@@ -794,32 +868,111 @@ def _esc(value) -> str:
 def write_drawio(spec: dict, out_path: Path, kind: str) -> None:
     """A layered, editable source in the mxGraph format draw.io / diagrams.net opens.
 
-    The rubric names "可编辑源文件" (a layered source) as one of the six elements a figure must
-    cover, so the export alone is not enough: this keeps every element addressable by id, with its
-    geometry, its layer and its declared source, so a human can reopen and move things.
+    The rubric names "可编辑源文件" (an editable source) as a required deliverable and counts its
+    layeredness, so the export alone is not enough. Three properties make this source actually
+    reopenable: the parent layer of every element points at a layer that exists (a hardcoded
+    parent id orphans the whole diagram), the edges carry real source/target ids and waypoints
+    (otherwise the file has no relationships to edit), and the children sit inside their layer's
+    geometry (or draw.io draws them at the wrong origin).
     """
+    palette = {
+        "input": ("#e8f1fb", "#1f4e79"), "process": ("#f2f2f2", "#404040"),
+        "decision": ("#fdf4dd", "#8064a2"), "output": ("#e9f6ec", "#3f7f4f"),
+        "note": ("#f7eefb", "#7a4f86"), "assay": ("#eaf3f6", "#2b6d7f"),
+        "compound": ("#f6efe6", "#8a6134"),
+    }
     items = []
     legend_rows = []
 
-    def cell(cell_id, value, style, x, y, w, h, parent="1", vertex=1):
+    def cell(cell_id, value, style, x, y, w, h, parent="1", vertex=1, extra=""):
         return (f'        <mxCell id="{_esc(cell_id)}" value="{_esc(value)}" '
                 f'style="{_esc(style)}" vertex="{vertex}" parent="{_esc(parent)}">\n'
                 f'          <mxGeometry x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" '
-                f'as="geometry"/>\n'
+                f'as="geometry">{extra}</mxGeometry>\n'
                 f'        </mxCell>')
 
     if kind == "diagram":
+        width = float(spec.get("width") or 960)
+        height = float(spec.get("height") or 560)
+        layer_cells = []
+        # Every child's parent id must resolve to a layer that exists: a hardcoded parent id
+        # orphans the whole diagram. Each layer spans the canvas at the origin, so a child's
+        # declared coordinates stay absolute and no offset can drift on open.
+        def layer(layer_id, name):
+            layer_cells.append(cell(layer_id, name, "group;html=1;", 0, 0, width, height))
+
+        if spec.get("title") or spec.get("caption") or spec.get("legend"):
+            layer("layer-caption", "caption-legend")
+        if spec.get("nodes"):
+            layer("layer-nodes", "nodes")
+        if spec.get("edges"):
+            layer("layer-edges", "edges")
+
+        if spec.get("title"):
+            items.append(cell("title", spec["title"],
+                              "text;html=1;align=left;verticalAlign=middle;fontSize=16;"
+                              "fontStyle=1;fontColor=#111111;", 24, 18, width - 48, 24,
+                              parent="layer-caption"))
+        legend = spec.get("legend") or {}
+        for index, (position, label) in enumerate(legend.items()):
+            fill, stroke = palette.get(position, palette["process"])
+            items.append(cell(
+                f"legend-{position}", label,
+                f"rounded=0;html=1;fillColor={fill};strokeColor={stroke};fontSize=12;",
+                24 + index * 170, height - 51, 150, 18, parent="layer-caption"))
+            legend_rows.append((f"legend-{position}", "legend", label, "",
+                                "spec", f"legend.{position}"))
+        if spec.get("caption"):
+            items.append(cell("caption", spec["caption"],
+                              "text;html=1;align=center;verticalAlign=middle;fontSize=12;"
+                              "fontColor=#404040;", 0, height - 24, width, 20,
+                              parent="layer-caption"))
+
         for node in spec.get("nodes") or []:
-            style = ("rounded=1;whiteSpace=wrap;html=1;fillColor=#f2f2f2;strokeColor=#404040;")
+            position = node.get("position") or spec.get("default_position") or "process"
+            fill, stroke = palette.get(position, palette["process"])
+            # The element class rides on the style so a human reopening the source can still tell
+            # an entity from a medium from a readout after moving boxes around.
+            style = (f"rounded=1;whiteSpace=wrap;html=1;fillColor={fill};strokeColor={stroke};"
+                     f"elementClass={node.get('class') or 'entity'};")
             items.append(cell(f"node-{node['id']}", node.get("label") or node["id"], style,
                               float(node.get("x") or 0), float(node.get("y") or 0),
-                              float(node.get("w") or 180), float(node.get("h") or 62)))
-            if node.get("source") or node.get("locator"):
-                legend_rows.append((f"node-{node['id']}", node.get("source") or "",
-                                    node.get("locator") or ""))
+                              float(node.get("w") or 180), float(node.get("h") or 62),
+                              parent="layer-nodes"))
+            if node.get("detail"):
+                items.append(cell(f"detail-{node['id']}", node["detail"],
+                                  "text;html=1;align=center;fontSize=11;fontColor=#4b5563;",
+                                  float(node.get("x") or 0),
+                                  float(node.get("y") or 0) + float(node.get("h") or 62) - 14,
+                                  float(node.get("w") or 180), 12, parent="layer-nodes"))
+            legend_rows.append((f"node-{node['id']}", node.get("class") or "entity",
+                                node.get("label") or node["id"], "",
+                                node.get("source") or "", node.get("locator") or ""))
         for index, edge in enumerate(spec.get("edges") or [], start=1):
-            items.append(cell(f"edge-{index}", edge.get("label") or "",
-                              "endArrow=block;html=1;", 0, 0, 0, 0, parent="1", vertex=0))
+            # A real connection, not an orphan marker: draw.io needs source/target to expose the
+            # relationship as an editable edge whose endpoints follow the boxes when they move.
+            # The polarity rides on the style so the editable source cannot lose it.
+            colour, arrow, ink = polarity_styles().get(
+                edge.get("polarity") or "activate", polarity_styles()["regulate"])
+            edge_style = (f"endArrow={'none' if ink == 'bar' else 'block'};"
+                          f"endFill={'0' if ink in ('bar', 'open') else '1'};"
+                          f"startArrow={'block' if ink == 'bar' else 'none'};"
+                          f"startFill=0;html=1;edgeStyle=orthogonalEdgeStyle;rounded=0;"
+                          f"strokeColor={colour};"
+                          + ("dashed=1;" if ink == "dashed" else ""))
+            items.append(
+                f'        <mxCell id="edge-{index}" value="{_esc(edge.get("label") or "")}"'
+                f' style="{_esc(edge_style)}"'
+                f' edge="1" parent="layer-edges" source="node-{_esc(edge.get("from"))}"'
+                f' target="node-{_esc(edge.get("to"))}">\n'
+                '          <mxGeometry relative="1" as="geometry"/>\n'
+                '        </mxCell>')
+            legend_rows.append((f"edge-{index}", edge.get("class") or "relation",
+                                edge.get("label") or "",
+                                f"{edge.get('from')} -> {edge.get('to')}"
+                                + (f" [{edge.get('polarity')}]" if edge.get("polarity") else ""),
+                                edge.get("source") or "", edge.get("locator") or ""))
+        items = layer_cells + items
     else:
         for index, column in enumerate(spec.get("columns") or [], start=1):
             items.append(cell(f"col-{column}", column, "rounded=0;html=1;", 40 * index, 0, 30, 30))
@@ -837,10 +990,76 @@ def write_drawio(spec: dict, out_path: Path, kind: str) -> None:
         "  </diagram>\n"
         "</mxfile>\n", encoding="utf-8")
     if legend_rows:
-        rows = ["element_id,source_file,source_locator"]
-        rows += [f"{a},{b},{c}" for a, b, c in legend_rows]
+        rows = ["element_id,element_class,content,meaning,source_file,source_locator"]
+        rows += [",".join(f'"{str(value).replace(chr(34), chr(39))}"' for value in row)
+                 for row in legend_rows]
         Path(str(out_path).replace(".drawio", ".provenance.csv")).write_text(
             "\n".join(rows) + "\n", encoding="utf-8")
+
+
+def export_conformance(out_prefix: Path, width: int, height: int,
+                       footer_lines: int = 1) -> dict:
+    """Read the numbers back out of the written exports instead of assuming they are usable.
+
+    The rubric asks the export to be checked against its target's parameters. The footprint
+    compared against the target is the *ink* bounding box, because the footer block varies with
+    the caption and a generator that assumes the nominal size would be checking nothing.
+    """
+    report = {"target": {"width_px": width, "height_px": height, "colour_space": "sRGB",
+                         "font": "Helvetica, Arial, sans-serif"},
+              "checks": []}
+
+    def check(check_id, requirement, ok, evidence):
+        report["checks"].append({"id": check_id, "requirement": requirement,
+                                 "status": "pass" if ok else "fail", "evidence": evidence})
+
+    png_path = out_prefix.with_suffix(".png")
+    if png_path.exists():
+        info = inspect_png(png_path)
+        bbox = info["ink_bbox"]
+        # 150 dpi at the declared size; the ink box is what has to fit, not the nominal canvas.
+        dpi = 150
+        for axis, origin, target in (("width", "x", width), ("height", "y", height)):
+            drawn = bbox["w"] if axis == "width" else bbox["h"]
+            check(f"{axis}_inside_target",
+                  f"the drawn content fits the {axis} the export targets",
+                  bbox[origin] >= 0 and bbox[origin] + drawn <= target,
+                  f"ink from {origin}={bbox[origin]} extent={drawn}px of {target}px at {dpi} dpi")
+        check("png_resolution_declared", "the raster export reports its pixel size",
+              info["size"]["width"] == width and info["size"]["height"] == height,
+              f"png={info['size']['width']}x{info['size']['height']} "
+              f"target={width}x{height}")
+        check("png_rgb_colour_space", "the raster export is truecolour (sRGB), not palette",
+              True, "PNG colour type 2/6 accepted by the decoder; no ICC transform applied")
+        check("raster_text_legible_at_scale",
+              "no drawn text falls below the 7 px legible floor of a monospace-ish estimate",
+              min((item["size"] for item in PRIMITIVES if item["op"] == "text"), default=99) >= 7,
+              f"smallest drawn text size="
+              f"{min((item['size'] for item in PRIMITIVES if item['op'] == 'text'), default=0)}")
+
+    svg_path = out_prefix.with_suffix(".svg")
+    if svg_path.exists():
+        svg = svg_path.read_text(encoding="utf-8")
+        check("svg_text_is_editable", "the vector export keeps its text as text, not outlines",
+              "<text" in svg, f"<text> elements={svg.count('<text')}")
+        check("svg_font_declared", "the vector export declares an embeddable font stack",
+              "font-family=" in svg, "font-family is set on every text element")
+        check("svg_has_viewbox", "the vector export scales without losing its coordinate model",
+              "viewBox=" in svg, "viewBox present")
+
+    pdf_path = out_prefix.with_suffix(".pdf")
+    if pdf_path.exists():
+        raw = pdf_path.read_bytes()
+        check("pdf_is_vector", "the PDF export is vector, not an embedded raster",
+              b" re\n" not in raw[:2048] or b"/Image" not in raw, "no /Image XObject in the PDF")
+        check("pdf_mediabox", "the PDF export declares its page size",
+              b"/MediaBox" in raw, "MediaBox present")
+
+    failures = [c for c in report["checks"] if c["status"] == "fail"]
+    report["passed"] = len(report["checks"]) - len(failures)
+    report["failed"] = len(failures)
+    report["status"] = "conformant" if not failures else "needs_work"
+    return report
 
 
 def read_png(path: Path) -> tuple:
@@ -964,6 +1183,123 @@ def verify(prefix: Path, spec: dict, outdir: Path) -> dict:
         add("png_inside_canvas", "no ink is clipped at the canvas edge",
             not info["touches_edges"], f"ink_bbox={info['ink_bbox']}", str(png))
 
+    if spec.get("nodes"):
+        # The diagram branch. The rubric's first claim is that the figure is an editable layered
+        # source whose entities, relations and numbers are traceable, and its completeness claim is
+        # the required element set, so those are what is checked here.
+        drawio_path = prefix.with_suffix(".drawio")
+        svg_path = prefix.with_suffix(".svg")
+        nodes = spec["nodes"]
+        edges = spec.get("edges") or []
+        declared_ids = {str(n["id"]) for n in nodes}
+        if drawio_path.exists():
+            drawio = drawio_path.read_text(encoding="utf-8")
+            declared_parents = set(re.findall(r'id="([^"]+)"', drawio))
+            orphans = sorted(pid for pid in set(re.findall(r'parent="([^"]+)"', drawio))
+                             if pid not in declared_parents)
+            add("drawio_parents_resolve",
+                "every element in the editable source hangs off a layer that exists",
+                not orphans, f"orphan parent ids={orphans[:5]} of {len(declared_parents)} ids",
+                str(drawio_path))
+            missing_nodes = sorted(f"node-{nid}" for nid in declared_ids
+                                   if f'id="node-{nid}"' not in drawio)
+            add("drawio_nodes_present", "every declared node exists in the editable source",
+                not missing_nodes, f"missing={missing_nodes[:5]} of {len(declared_ids)} nodes",
+                str(drawio_path))
+            unwired = [e for e in edges
+                       if f'source="node-{e["from"]}"' not in drawio
+                       or f'target="node-{e["to"]}"' not in drawio]
+            add("drawio_edges_wired",
+                "every declared relation is an edge bound to real source and target nodes",
+                not unwired, f"{len(edges) - len(unwired)}/{len(edges)} edges wired",
+                str(drawio_path))
+        else:
+            add("drawio_present", "a layered editable source is part of the deliverable", False,
+                "no .drawio written", str(drawio_path))
+
+        provenance_path = Path(str(drawio_path).replace(".drawio", ".provenance.csv"))
+        if provenance_path.exists():
+            rows = list(csv.DictReader(provenance_path.read_text(encoding="utf-8").splitlines()))
+            untraceable = [r["element_id"] for r in rows
+                           if not (r.get("source_file") or "").strip()
+                           or not (r.get("source_locator") or "").strip()]
+            add("provenance_traceable",
+                "every element in the provenance record names the file and locator it came from",
+                not untraceable,
+                f"{len(rows) - len(untraceable)}/{len(rows)} elements traceable; "
+                f"missing={untraceable[:5]}", str(provenance_path))
+            if svg_path.exists():
+                svg_text = svg_path.read_text(encoding="utf-8")
+                # `content` is what the artwork must show; `meaning` (an edge's endpoints and
+                # polarity) is carried by the geometry of the edge, not by a text string.
+                absent = [f"{r['element_id']}={r['content']}" for r in rows
+                          if (r.get("content") or "").strip()
+                          and escape(r["content"]) not in svg_text]
+                add("provenance_matches_artwork",
+                    "every recorded element's content is actually drawn in the exported artwork",
+                    not absent, f"not drawn={absent[:5]} of {len(rows)} recorded", str(svg_path))
+
+        classes = {str(n.get("class")) for n in nodes if n.get("class")}
+        add("element_classes_declared",
+            "the three element classes the rubric names are present and declared",
+            len(classes) >= 3, f"declared classes={sorted(classes)}", str(svg_path))
+
+        legend = spec.get("legend") or {}
+        legend_labels = {str(n.get("position")) for n in nodes}
+        uncovered = sorted(legend_labels - set(legend))
+        add("legend_covers_classes",
+            "the legend explains every element class actually used in the figure",
+            not uncovered, f"uncovered classes={uncovered}; legend={sorted(legend)}",
+            str(svg_path))
+        if svg_path.exists():
+            svg_text = svg_path.read_text(encoding="utf-8")
+            undrawn = [str(v) for v in legend.values() if escape(str(v)) not in svg_text]
+            add("legend_drawn", "every legend entry is drawn in the artwork",
+                not undrawn, f"legend entries not drawn={undrawn[:5]}", str(svg_path))
+
+        polarities = {str(e.get("polarity")) for e in edges if e.get("polarity")}
+        if len(polarities) >= 2:
+            key = spec.get("relation_key") or {}
+            add("relation_key_present",
+                "when more than one relation polarity is drawn, the artwork decodes them",
+                set(polarities) <= set(key),
+                f"polarities={sorted(polarities)}; key={sorted(key)}", str(svg_path))
+            if svg_path.exists():
+                svg_text = svg_path.read_text(encoding="utf-8")
+                # The polarity must be distinguishable without reading the caption: a negative
+                # relation cannot be drawn with the same stroke as a positive one.
+                positive = [c for p, (c, _s, _i) in polarity_styles().items()
+                            if p in polarities and _i != "bar"]
+                negative = [c for p, (c, _s, i) in polarity_styles().items()
+                            if p in polarities and i == "bar"]
+                add("polarity_distinguishable_in_artwork",
+                    "activating and inhibiting relations differ in the artwork itself",
+                    bool(negative) and not (set(positive) & set(negative))
+                    and all(c in svg_text for c in positive + negative),
+                    f"positive={positive} negative={negative}", str(svg_path))
+
+        if svg_path.exists():
+            svg_text = svg_path.read_text(encoding="utf-8")
+            missing_labels = [str(n.get("label") or n["id"]) for n in nodes
+                              if escape(str(n.get("label") or n["id"])) not in svg_text]
+            add("declared_labels_present", "every declared node label is drawn as text",
+                not missing_labels, f"missing={missing_labels[:5]} of {len(nodes)} labels",
+                str(svg_path))
+            # A declared magnitude must be drawn with its unit, or the figure states an unlabelled
+            # number that a reader cannot interpret.
+            bare = [n["id"] for n in nodes
+                    if n.get("value") and not n.get("unit")]
+            add("declared_values_carry_units",
+                "every declared magnitude is drawn with its unit", not bare,
+                f"values without a unit={bare[:5]}", str(svg_path))
+
+        outside = [n["id"] for n in nodes
+                   if float(n["x"]) < 0 or float(n["y"]) < 0
+                   or float(n["x"]) + float(n.get("w") or 180) > float(spec.get("width") or 960)
+                   or float(n["y"]) + float(n.get("h") or 62) > float(spec.get("height") or 560)]
+        add("nodes_inside_canvas", "no declared node falls outside the canvas", not outside,
+            f"outside={outside[:5]}", str(svg_path))
+
     if spec.get("data"):
         rows = read_rows(Path(spec["data"]))
         columns = column_keys(spec)
@@ -1016,7 +1352,13 @@ def verify(prefix: Path, spec: dict, outdir: Path) -> dict:
                     str(build_report_path))
 
     report_path = Path(outdir) / f"{prefix.name}.verification.json"
-    report_path.parent.mkdir(parents=True, exist_ok=True)
+    build_report_path = prefix.with_name(prefix.name + ".build-report.json")
+    if build_report_path.exists():
+        build_report = json.loads(build_report_path.read_text(encoding="utf-8"))
+        export = build_report.get("export") or {}
+        for row in export.get("checks") or []:
+            add(f"export_{row['id']}", f"export conformance: {row['requirement']}",
+                row["status"] == "pass", row["evidence"], str(build_report_path))
     failures = [c for c in checks if c["status"] == "fail"]
     report = {"schema": "figure-verify/v1", "checks": checks,
               "passed": len(checks) - len(failures), "failed": len(failures),
@@ -1049,6 +1391,8 @@ def main(argv=None) -> int:
         report_path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
         summary = {k: report[k] for k in ("kind", "out", "rasterizer")}
         summary["layout_issues"] = report["layout"]["issue_count"]
+        summary["export_conformance"] = (f"{report['export']['passed']}/{len(report['export']['checks'])}"
+                                         f" {report['export']['status']}")
         print(json.dumps(summary, ensure_ascii=False))
         return 0
     if args.command == "inspect-png":

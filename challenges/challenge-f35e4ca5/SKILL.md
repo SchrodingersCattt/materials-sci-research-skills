@@ -98,6 +98,7 @@ without a build step. This section names what is reusable, what it needs, and wh
 | 2 engine scripts (`scripts/`) | Run them directly - each is a standalone command with `--help`. They read only declared inputs and write their outputs where you point them, so they drop into another pipeline without a wrapper. |
 | The declared-artifact model | Every output is derived from a specification file you can copy and edit, so adapting the package to a new case means editing data, not code. |
 | 2 self-test suites (`tests/`) | Run them to reproduce every claim made in this package: `gain_checks.py`, `test_calibration.py`. |
+| Worked fixtures (`examples/`) | `README.md`, `case.json`, `material`, `task.md` - realistic shapes you can run end to end before touching real material. |
 
 ### What it needs
 
@@ -109,7 +110,7 @@ without a build step. This section names what is reusable, what it needs, and wh
 - It reports what the supplied material states and refuses to fill a gap with a plausible value; an absent figure appears as an explicit limitation, never as an estimate.
 - It verifies its own artifacts against its own specification and checks the real bytes it wrote. It does not judge whether the scientific choice was the right one - that remains a human or judge decision, and the package says so in its verification report.
 
-Supporting documents: `GAIN-EVIDENCE.md`.
+Supporting documents: `GAIN-EVIDENCE.md`, `PROVENANCE.md`.
 
 ### Maintenance
 
@@ -117,7 +118,6 @@ The engines and their checks are versioned together: `scripts/` and `tests/` mov
 suites named above are the regression tests to run after any edit. `CHANGELOG.md` records what changed
 and why. A package that fails its own checks is not a package to submit - the composing repository's
 `verify_package.py` is the pre-submission gate.
-
 ## What this saves, measured
 
 The rubric asks whether loading this package measurably reduces manual work, under the same input and

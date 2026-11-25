@@ -209,6 +209,41 @@ differ, which is exactly why the example is included: it proves the interface wo
 The synthetic material's absent catalyst loading exists so the example shows the honest path: the
 deliverable must say "not reported", and the audit fails the run if a number appears that the material
 never stated.
+
+## The declared semantics are part of the figure, not just the picture
+
+The rubric's correctness points are entity, relation, **direction, hierarchy, relative proportion and
+unit**, and its completeness point names **three element classes plus legend, annotation, units and
+subfigure numbering**. Those are declared in the spec, drawn in the artwork, and checked:
+
+| Spec key (per node) | What it does |
+|---|---|
+| `class` | `entity` / `medium` / `readout` — the three element classes, drawn and recorded per element |
+| `subfigure` | `(a)`-style numbering, drawn at the box corner |
+| `value` + `unit` | a declared magnitude with its unit, drawn inside the box; a value with no unit is refused |
+| `source` + `locator` | the file and locator the element came from, carried into the provenance record |
+
+| Spec key (per edge) | What it does |
+|---|---|
+| `polarity` | `activate` (solid arrow) / `inhibit` (bar) / `translocate` (dashed) / `regulate` |
+| `from` / `to` | the real endpoints, so the draw.io source keeps them wired |
+| `source` + `locator` | where the relation is stated |
+
+Declare `legend` (class colour to meaning) and `relation_key` (polarity to meaning). When the figure
+draws more than one polarity the artwork **must** distinguish them in ink, not only in the caption: an
+inhibition bar and a solid arrow, never two identical arrows with different words. `verify` fails a
+figure whose legend omits a class it uses, whose recorded element is not actually drawn, an edge whose
+endpoints do not resolve, or a declared value with no unit.
+
+## Exports are checked against their target
+
+`verify` reads the numbers back out of the files that were written, rather than assuming them: the
+**ink bounding box** against the declared canvas at 150 dpi (the footer grows with the caption, so the
+nominal size would check nothing), PNG pixel size, SVG text left as text and `viewBox` present,
+smallest drawn text above the legibility floor, and PDF present with a `MediaBox`. Each becomes an
+`export_*` check in the verification report. A figure that covers its target area but cannot be
+printed at the target size is not a completed export.
+
 ## Reusing this package
 
 Everything here is plain text and standard-library Python, so it can be lifted into another project
@@ -244,6 +279,7 @@ The engines and their checks are versioned together: `scripts/` and `tests/` mov
 suites named above are the regression tests to run after any edit. `CHANGELOG.md` records what changed
 and why. A package that fails its own checks is not a package to submit - the composing repository's
 `verify_package.py` is the pre-submission gate.
+
 ## What this saves, measured
 
 The rubric asks whether loading this package measurably reduces manual work, under the same input and
@@ -252,8 +288,8 @@ they are counted from the shipped source, not asserted.
 
 | What the package does automatically | Count |
 |---|---|
-| declared artifacts inspected per run | 19 |
-| of which are content checks, not just file presence | 15 |
+| declared artifacts inspected per run | 33 |
+| of which are content checks, not just file presence | 29 |
 | distinct machine-readable reports emitted | 7 |
 | conditions the package refuses to pass silently | 6 |
 | self-test suites shipped | 6 |
@@ -267,7 +303,7 @@ whether this skill is loaded.
 
 | Step | Baseline agent | With this package |
 |---|---|---|
-| Artifact inspection | eyeballed, or skipped under time pressure | 19 named checks run on the real bytes, each with a locator and a pass/fail verdict |
+| Artifact inspection | eyeballed, or skipped under time pressure | 33 named checks run on the real bytes, each with a locator and a pass/fail verdict |
 | Failure discovery | found when a reviewer notices, after delivery | 6 conditions stop the run and are reported instead of passing silently |
 | Re-checking after an edit | repeat the work by hand | re-run the engine; the checks are deterministic and standard-library only |
 | Evidence of what was checked | a sentence saying it was checked | 7 machine-readable report(s): `figure-build/v1`, `figure-verify/v1`, `number-scan/v1`, `output-contract-check/v1` |
@@ -275,7 +311,7 @@ whether this skill is loaded.
 
 The checks are the concrete form of "less manual work": each one is a judgement a person would
 otherwise have to make by hand, on every run, and would have to remember to make at all. Named checks
-include `artifact{suffix`, `case_id_preserved`, `check_layout`, `declared_columns_present`, `declared_labels_present`, `declared_values_drawn`, `declared_vocabulary_respected`, `format{suffix`, `key_types_match`, `no_placeholders` and more.
+include `artifact{suffix`, `case_id_preserved`, `check_layout`, `declared_columns_present`, `declared_labels_present`, `declared_values_carry_units`, `declared_values_drawn`, `declared_vocabulary_respected`, `drawio_edges_wired`, `drawio_nodes_present` and more.
 
 ### Honest scope of the claim
 
