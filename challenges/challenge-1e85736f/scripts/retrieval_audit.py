@@ -16,6 +16,14 @@ That is record-keeping. This module makes the record mechanical.
     python retrieval_audit.py synonyms  --terms t.json --out synonyms.json
     python retrieval_audit.py reconcile --screening screening.json --out counts.json
     python retrieval_audit.py verify    --screening screening.json --out verify.json
+    python retrieval_audit.py ingest    --sources sources.json --corpus corpus.csv --out ingest.json
+    python retrieval_audit.py references --records corpus.csv --out references.json
+    python retrieval_audit.py delta     --previous corpus-s0.csv --current corpus-s1.csv --out delta.json
+
+`ingest`, `references` and `delta` are the source-bound layer: they normalise the responses the case
+actually supplies (Crossref, EuropePMC, publisher JSON/JSONL/CSV) into the canonical record shape, keep
+the reference graph those responses state, and compare two import states so a resumed import says what
+is new rather than re-importing everything.
 
 Python standard library only. No network.
 """
@@ -27,6 +35,7 @@ import csv
 import json
 import re
 import sys
+import time
 from collections import Counter
 from pathlib import Path
 
@@ -358,6 +367,375 @@ def verify(screening: dict) -> dict:
     }
 
 
+# ------------------------------------------------------------------ source-bound corpus
+
+# The canonical record shape every supplied source is normalised into. Keep this fixed: the rest of the
+# audit (screening, coverage, appraisal) reads these names, so a case-supplied Crossref response and a
+# case-supplied EuropePMC response have to arrive here looking the same.
+CORPUS_FIELDS = ("id", "source", "source_locator", "title", "authors", "year", "journal", "doi",
+                 "abstract", "type", "language", "references")
+
+KEY_ALIASES = {
+    "title": ("title", "Title", "article-title", "documentTitle"),
+    "year": ("year", "Year", "pubYear", "publication_year", "published", "date"),
+    "journal": ("journal", "journalTitle", "container-title", "container_title", "source_title"),
+    "doi": ("doi", "DOI", "Doi"),
+    "abstract": ("abstract", "Abstract", "summary"),
+    "type": ("type", "Type", "document_type", "pubType"),
+    "language": ("language", "Language", "lang"),
+    "authors": ("authors", "author", "authorString", "Author", "creators"),
+    "references": ("references", "reference", "cited", "cites", "outbound_references"),
+}
+
+
+def _scalar(value) -> str:
+    if isinstance(value, list):
+        return _scalar(value[0]) if value else ""
+    if value is None:
+        return ""
+    return value if isinstance(value, str) else str(value)
+
+
+def _authors(value) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, list):
+        names = []
+        for entry in value:
+            if isinstance(entry, str):
+                names.append(entry)
+            elif isinstance(entry, dict):
+                joined = " ".join(part for part in (entry.get("given"), entry.get("family")) if part)
+                names.append(joined or _scalar(entry.get("name")))
+        return "; ".join(n for n in names if n)
+    return ""
+
+
+def _pick(item: dict, field: str) -> str:
+    for key in KEY_ALIASES.get(field, ()):
+        if key in item and item.get(key) not in (None, "", [], {}):
+            return _scalar(item.get(key))
+    return ""
+
+
+def norm_record(item: dict, source: str, locator: str) -> dict:
+    """Normalise one supplied record. Crossref, EuropePMC and loose publisher shapes are handled."""
+    if not isinstance(item, dict):
+        return {}
+    if "DOI" in item or "container-title" in item or "issued" in item:      # Crossref message item
+        parts = ((item.get("issued") or {}).get("date-parts") or [[]])[0]
+        record = {
+            "title": _scalar(item.get("title")),
+            "authors": _authors(item.get("author")),
+            "year": _scalar(parts[0]) if parts else "",
+            "journal": _scalar(item.get("container-title")),
+            "doi": _scalar(item.get("DOI")),
+            "abstract": _scalar(item.get("abstract")),
+            "type": _scalar(item.get("type")),
+            "language": _scalar(item.get("language")) or _scalar(item.get("language")),
+            "references": item.get("reference") or [],
+        }
+    elif "resultList" in item or "authorString" in item or "pubYear" in item:   # EuropePMC result
+        record = {
+            "title": _scalar(item.get("title")),
+            "authors": _authors(item.get("authorString") or item.get("authorList")),
+            "year": _scalar(item.get("pubYear")),
+            "journal": _scalar(item.get("journalTitle") or item.get("bookOrReportDetails")),
+            "doi": _scalar(item.get("doi") or item.get("DOI")),
+            "abstract": _scalar(item.get("abstractText")),
+            "type": _scalar(item.get("pubType")),
+            "language": _scalar(item.get("language")),
+            "references": item.get("references") or [],
+        }
+    else:                                                                    # loose/generic shape
+        record = {field: (_authors(item.get(field)) if field == "authors" else _pick(item, field))
+                  for field in ("title", "year", "journal", "doi", "abstract", "type", "language")}
+        record["authors"] = _authors(_pick(item, "authors") or item.get("author"))
+        references = None
+        for key in KEY_ALIASES["references"]:
+            if item.get(key):
+                references = item.get(key)
+                break
+        record["references"] = references or []
+
+    record = {field: record.get(field, "") for field in CORPUS_FIELDS}
+    record["source"] = source
+    record["source_locator"] = locator
+    record["id"] = record.get("doi") or ""
+    record["references"] = record.get("references") or []
+    return record
+
+
+def read_source_payload(path: Path):
+    """Read a supplied source response in whichever of the three shapes it arrives in."""
+    if path.suffix.lower() == ".csv":
+        return read_csv(path)
+    text = path.read_text(encoding="utf-8-sig", errors="replace")
+    try:
+        return json.loads(text)
+    except ValueError:
+        rows = [json.loads(line) for line in text.splitlines() if line.strip()]
+        return rows
+
+
+def _record_list(payload, locator: str) -> list[dict]:
+    """Find the record array inside a supplied response, whatever wrapper it arrives in."""
+    if isinstance(payload, list):
+        return payload
+    if not isinstance(payload, dict):
+        return []
+    for key in ("items", "records", "results", "data", "works", "documents"):
+        if isinstance(payload.get(key), list):
+            return payload[key]
+    for key in ("message", "resultList"):
+        inner = payload.get(key)
+        if isinstance(inner, dict):
+            for sub in ("items", "result"):
+                if isinstance(inner.get(sub), list):
+                    return inner[sub]
+        if isinstance(inner, list):
+            return inner
+    return []
+
+
+def ingest(sources: list[dict], state_path=None) -> dict:
+    """Build the corpus record from the case's own source responses.
+
+    Every record keeps the position inside the file it came from, because a record with no locator is not
+    evidence. Nothing is invented: a record that does not report a title is dropped and named, and a
+    record that repeats an identity already seen is merged and named. Both are recorded rather than
+    absorbed, which is what makes a second person able to rebuild this exact corpus.
+    """
+    findings: list[dict] = []
+    records: list[dict] = []
+    duplicates: list[dict] = []
+    dropped: list[dict] = []
+    per_source: dict[str, int] = {}
+    seen: dict[str, dict] = {}
+
+    for entry in sources:
+        source = _scalar(entry.get("source")) or Path(_scalar(entry.get("path"))).stem
+        path = Path(_scalar(entry.get("path")))
+        if not path.exists():
+            findings.append({"dimension": "source_ingest", "severity": "high", "locator": str(path),
+                             "evidence": "declared source file not present",
+                             "suggested_action": "fix the path or drop the declaration; a source that cannot be read is not evidence"})
+            continue
+        try:
+            payload = read_source_payload(path)
+        except (OSError, ValueError) as exc:
+            findings.append({"dimension": "source_ingest", "severity": "high", "locator": str(path),
+                             "evidence": f"unreadable: {exc.__class__.__name__}",
+                             "suggested_action": "supply the response in the shape the case provides it; do not paraphrase it"})
+            continue
+        items = _record_list(payload, str(path))
+        per_source[source] = per_source.get(source, 0) + len(items)
+        for index, item in enumerate(items):
+            locator = f"{path}#/{index}"
+            record = norm_record(item, source, locator)
+            if not record:
+                dropped.append({"locator": locator, "reason": "not a record object"})
+                continue
+            if not record["title"]:
+                dropped.append({"locator": locator, "reason": "reports no title, so it cannot be included honestly",
+                                "suggested_action": "keep it in the dropped list; do not supply a title the source does not state"})
+                continue
+            key = (record["id"] or f"{record['title'].strip().lower()}|{record['year']}").lower()
+            if not record["id"]:
+                record["id"] = "local:" + re.sub(r"\W+", "-", record["title"].strip().lower())[:40]
+                record["id_derived"] = True
+            if key in seen:
+                first = seen[key]
+                if first["title"].strip().lower() != record["title"].strip().lower():
+                    findings.append({"dimension": "source_identity", "severity": "high", "locator": locator,
+                                     "evidence": f"id {record['id']} carries two different titles",
+                                     "suggested_action": "decide whether these are one work or two and say so; do not merge silently"})
+                duplicates.append({"locator": locator, "duplicate_of": first["source_locator"],
+                                   "reason": "same DOI or same title+year already seen"})
+                continue
+            seen[key] = record
+            records.append(record)
+
+    if not records:
+        findings.append({"dimension": "source_ingest", "severity": "high", "locator": "sources",
+                         "evidence": "no record survived ingestion",
+                         "suggested_action": "check the declared paths and shapes before screening anything"})
+
+    counts = {"declared_sources": len(sources), "per_source": per_source, "records": len(records),
+              "dropped": len(dropped), "merged_duplicates": len(duplicates)}
+    result = {"schema": SCHEMA, "counts": counts, "dropped": dropped, "duplicates": duplicates,
+              "findings": findings, "records": records,
+              "status": "needs_work" if any(f["severity"] == "high" for f in findings) else "complete",
+              "rule": ("each record keeps the source it came from and the position inside it; a record "
+                       "without a title is named rather than given one, and an identity already seen is "
+                       "merged rather than counted twice")}
+    if state_path is not None:
+        result["state"] = _write_state(state_path, {"stage": "ingest", "records": len(records)})
+    return result
+
+
+def _refs(value) -> list:
+    """The reference list as stored in a corpus CSV is a JSON string; accept both shapes."""
+    if value is None or value == "":
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            return [part for part in re.split(r"[;\n]+", text) if part.strip()]
+        return parsed if isinstance(parsed, list) else [parsed]
+    return [value]
+
+
+def retained_reference_graph(records: list[dict], state_path=None) -> dict:
+    """Keep the reference graph the corpus states, with the locator that produced each edge.
+
+    The briefs ask for a retained reference graph rather than a claim about one: every edge names the
+    record and the position the citation was read at, and an edge whose target is not in the corpus is
+    reported as external rather than dropped or invented.
+    """
+    by_id = {}
+    for record in records:
+        for key in (record.get("id"), record.get("doi")):
+            if key:
+                by_id[str(key).strip().lower()] = record
+    edges: list[dict] = []
+    findings: list[dict] = []
+    for record in records:
+        cited = _refs(record.get("references"))
+        if not cited:
+            continue
+        for index, entry in enumerate(cited):
+            target = entry if isinstance(entry, str) else _scalar(
+                (entry or {}).get("DOI") or (entry or {}).get("doi") or (entry or {}).get("id") or
+                (entry or {}).get("key") or (entry or {}).get("unstructured") or (entry or {}).get("article-title"))
+            locator = f"{record.get('source_locator')}/reference/{index}"
+            hit = by_id.get(target.strip().lower()) if target else None
+            if target and hit is None:
+                for candidate in by_id.values():
+                    if target and (target.strip().lower() == str(candidate.get("title", "")).strip().lower()):
+                        hit = candidate
+                        break
+            edges.append({"from": record.get("id"), "to": hit.get("id") if hit else None,
+                          "to_reported": target, "internal": hit is not None, "evidence": locator})
+            if not target:
+                findings.append({"dimension": "reference_graph", "severity": "medium", "locator": locator,
+                                 "evidence": "a citation entry with no identifier and no title",
+                                 "suggested_action": "record the citation as it is reported, or exclude the entry and say so"})
+    internal = [e for e in edges if e["internal"]]
+    external = [e for e in edges if not e["internal"]]
+    if records and not edges:
+        findings.append({"dimension": "reference_graph", "severity": "high", "locator": "records",
+                         "evidence": "no record states what it cites",
+                         "suggested_action": "retain the reference lists the sources supply; an empty graph is not a retained graph"})
+    in_degree = Counter(e["to"] for e in internal)
+    citing = {e["from"] for e in edges}
+    cited = set(in_degree)
+    isolated = [r.get("id") for r in records if r.get("id") not in citing and r.get("id") not in cited]
+    result = {"schema": SCHEMA, "nodes": len(records), "edges": len(edges),
+              "internal_edges": len(internal), "external_edges": len(external),
+              "representatives": [{"id": node, "cited_by": count} for node, count in in_degree.most_common()],
+              "isolated": isolated, "graph": edges, "findings": findings,
+              "status": "needs_work" if any(f["severity"] == "high" for f in findings) else "complete",
+              "rule": ("every edge keeps the position it was read at and says whether its target is in "
+                       "the corpus, so the graph can be re-derived and its external parts are not "
+                       "mistaken for coverage")}
+    if state_path is not None:
+        result["state"] = _write_state(state_path, {"stage": "references", "edges": len(edges)})
+    return result
+
+
+def import_delta(previous: list[dict], current: list[dict], state_path=None) -> dict:
+    """Compare two import states, so a resumed run says what is new, changed and gone.
+
+    The case hands over an import that is already in progress. Resuming it means the difference against
+    the previous state is computable, and a record that changed under a stable identity is reported as
+    changed rather than as new.
+    """
+    findings: list[dict] = []
+    old = {}
+    for row in previous:
+        key = _scalar(row.get("id")) or _scalar(row.get("doi"))
+        if key:
+            old[key.strip().lower()] = row
+    new = {}
+    order = []
+    for index, row in enumerate(current):
+        key = (_scalar(row.get("id")) or _scalar(row.get("doi"))).strip().lower()
+        if not key:
+            findings.append({"dimension": "import_state", "severity": "high", "locator": f"current[{index}]",
+                             "evidence": "record with no identity",
+                             "suggested_action": "give the record the identity the source reports; an identity-less record cannot be resumed"})
+            continue
+        if key in new and _scalar(new[key].get("title")) != _scalar(row.get("title")):
+            findings.append({"dimension": "import_state", "severity": "high", "locator": f"current[{index}]",
+                             "evidence": f"{key} appears twice with different titles",
+                             "suggested_action": "resolve the collision before resuming; the import cannot tell one work from two"})
+        new[key] = row
+        order.append(key)
+    added = [k for k in order if k not in old]
+    changed = []
+    for key in order:
+        if key not in old:
+            continue
+        fields = [field for field in ("title", "year", "doi", "journal", "authors", "abstract")
+                  if _scalar(old[key].get(field)) != _scalar(new[key].get(field))]
+        if fields:
+            changed.append({"id": key, "fields": fields,
+                            "was": {f: _scalar(old[key].get(f)) for f in fields},
+                            "now": {f: _scalar(new[key].get(f)) for f in fields}})
+    removed = [k for k in old if k not in new]
+    result = {"schema": SCHEMA, "previous": len(old), "current": len(new),
+              "added": added, "changed": changed, "removed": removed,
+              "unchanged": len([k for k in order if k in old and k not in {c['id'] for c in changed}]),
+              "findings": findings,
+              "status": "needs_work" if any(f["severity"] == "high" for f in findings) else "complete",
+              "rule": ("resuming an import reports what is new, what changed under a stable identity and "
+                       "what is gone; a changed record is never reported as new")}
+    if state_path is not None:
+        result["state"] = _write_state(state_path, {"stage": "delta", "added": len(added),
+                                                    "changed": len(changed), "removed": len(removed)})
+    return result
+
+
+def _write_state(state_path, payload: dict) -> dict:
+    """Keep the import state so a later run is incremental rather than from scratch."""
+    target = Path(state_path)
+    previous = None
+    if target.exists():
+        try:
+            previous = json.loads(target.read_text(encoding="utf-8"))
+        except ValueError:
+            previous = None
+    state = dict(payload)
+    state["imported_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    if previous:
+        state["resumed_from"] = previous.get("imported_at")
+        state["increments"] = int(previous.get("increments") or 0) + 1
+    else:
+        state["increments"] = 1
+    write_json(target, state)
+    return state
+
+
+def write_corpus(path, records: list[dict]) -> None:
+    target = Path(path)
+    if target.parent and not target.parent.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+    with open(target, "w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=list(CORPUS_FIELDS), extrasaction="ignore")
+        writer.writeheader()
+        for record in records:
+            row = {field: record.get(field, "") for field in CORPUS_FIELDS}
+            row["references"] = json.dumps(record.get("references") or [], ensure_ascii=False)
+            writer.writerow(row)
+
+
 # ------------------------------------------------------------------ cli
 
 def read_csv(path: Path) -> list[dict]:
@@ -387,6 +765,9 @@ def main(argv=None) -> int:
     p = sub.add_parser("synonyms"); p.add_argument("--terms", required=True); p.add_argument("--out", required=True)
     p = sub.add_parser("reconcile"); p.add_argument("--screening", required=True); p.add_argument("--out", required=True)
     p = sub.add_parser("verify"); p.add_argument("--screening", required=True); p.add_argument("--out", required=True)
+    p = sub.add_parser("ingest"); p.add_argument("--sources", required=True); p.add_argument("--corpus", required=True); p.add_argument("--out", required=True); p.add_argument("--state", default=None)
+    p = sub.add_parser("references"); p.add_argument("--records", required=True); p.add_argument("--out", required=True); p.add_argument("--state", default=None)
+    p = sub.add_parser("delta"); p.add_argument("--previous", required=True); p.add_argument("--current", required=True); p.add_argument("--out", required=True); p.add_argument("--state", default=None)
 
     args = parser.parse_args(argv)
 
@@ -425,6 +806,27 @@ def main(argv=None) -> int:
         result = verify(read_json(args.screening)); write_json(args.out, result)
         print(json.dumps({"included": result["included"], "status": result["status"]}, ensure_ascii=False))
         return 0 if result["status"] == "verified" else 3
+    if args.command == "ingest":
+        result = ingest(read_json(args.sources).get("sources") if isinstance(read_json(args.sources), dict)
+                        else read_json(args.sources), args.state)
+        write_corpus(args.corpus, result["records"])
+        write_json(args.out, {k: v for k, v in result.items() if k != "records"})
+        print(json.dumps({"records": result["counts"]["records"], "dropped": result["counts"]["dropped"],
+                          "status": result["status"]}, ensure_ascii=False))
+        return 0 if result["status"] == "complete" else 3
+    if args.command == "references":
+        result = retained_reference_graph(read_csv(args.records), args.state)
+        write_json(args.out, result)
+        print(json.dumps({"nodes": result["nodes"], "internal_edges": result["internal_edges"],
+                          "external_edges": result["external_edges"], "isolated": len(result["isolated"]),
+                          "status": result["status"]}, ensure_ascii=False))
+        return 0 if result["status"] == "complete" else 3
+    if args.command == "delta":
+        result = import_delta(read_csv(args.previous), read_csv(args.current), args.state)
+        write_json(args.out, result)
+        print(json.dumps({"added": len(result["added"]), "changed": len(result["changed"]),
+                          "removed": len(result["removed"]), "status": result["status"]}, ensure_ascii=False))
+        return 0 if result["status"] == "complete" else 3
     return 1
 
 

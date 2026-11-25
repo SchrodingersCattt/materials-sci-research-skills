@@ -356,11 +356,42 @@ def find_shape_by_placeholder(root, placeholder: str):
             if placeholder == name:
                 return shape
             continue
-        kind = marker.get("type") or "body"
-        idx = marker.get("idx") or "1"
-        if placeholder in (kind, f"idx:{idx}", name):
+        kind = marker.get("type") or "obj"
+        idx = marker.get("idx") or "0"
+        aliases={"ctrTitle":"title","subTitle":"subtitle","obj":"body"}
+        if placeholder in (kind, aliases.get(kind), f"idx:{idx}", name):
             return shape
     return None
+
+
+def slide_order(parts: dict) -> list:
+    root=root_of(parts,"ppt/presentation.xml")
+    if root is None: return []
+    relationships=rels_of(parts,"ppt/presentation.xml")
+    return [relationships[e.get("{"+R+"}id")]["resolved"] for e in root.findall(".//{"+P+"}sldId") if e.get("{"+R+"}id") in relationships]
+
+
+def instantiate_layout(parts: dict,names: list,layout_part: str) -> str:
+    """Create a real slide from an unused layout, without copying unrelated slide content."""
+    highest=max([int(m.group(1)) for m in (SLIDE_RE.match(n) for n in names) if m] or [0])
+    new=f"ppt/slides/slide{highest+1}.xml"
+    layout=root_of(parts,layout_part)
+    tree=layout.find(".//{"+P+"}spTree")
+    if tree is None: raise ValueError("requested layout has no shape tree")
+    root=ET.Element("{"+P+"}sld"); c=ET.SubElement(root,"{"+P+"}cSld"); out_tree=ET.SubElement(c,"{"+P+"}spTree")
+    for node in tree:
+        if node.tag in ("{"+P+"}nvGrpSpPr","{"+P+"}grpSpPr") or (node.tag=="{"+P+"}sp" and node.find(".//{"+P+"}ph") is not None):
+            out_tree.append(copy.deepcopy(node))
+    clr=ET.SubElement(root,"{"+P+"}clrMapOvr");ET.SubElement(clr,"{"+A+"}masterClrMapping")
+    parts[new]=ET.tostring(root,encoding="utf-8",xml_declaration=True);names.append(new)
+    rels=ET.Element("{"+PKG_REL+"}Relationships")
+    ET.SubElement(rels,"{"+PKG_REL+"}Relationship",{"Id":"rId1","Type":R+"/slideLayout","Target":"../slideLayouts/"+layout_part.split("/")[-1]})
+    relname="ppt/slides/_rels/"+new.split("/")[-1]+".rels"
+    parts[relname]=ET.tostring(rels,encoding="utf-8",xml_declaration=True);names.append(relname)
+    ct=ET.fromstring(parts["[Content_Types].xml"]);ns=ct.tag.split("}")[0]+"}"
+    ET.SubElement(ct,ns+"Override",{"PartName":"/"+new,"ContentType":"application/vnd.openxmlformats-officedocument.presentationml.slide+xml"})
+    parts["[Content_Types].xml"]=ET.tostring(ct,encoding="utf-8",xml_declaration=True)
+    return new
 
 
 def next_free_ids(parts: dict) -> dict:
@@ -422,12 +453,14 @@ def add_slide_to_presentation(parts: dict, slide_part: str) -> dict:
     if presentation is None:
         raise SystemExit("ppt/presentation.xml is missing")
     ids = next_free_ids(parts)
-    entry = (f'<p:sldId id="{ids["slide_id"]}" r:id="rId{ids["rel_id"]}"/>')
-    raw = parts["ppt/presentation.xml"]
-    try:
-        parts["ppt/presentation.xml"] = insert_before_close(raw, "</p:sldIdLst>", entry)
-    except ValueError as error:
-        raise SystemExit(f"presentation.xml has no slide id list: {error}")
+    raw=parts["ppt/presentation.xml"]
+    listing=presentation.find("{"+P+"}sldIdLst")
+    if listing is None:
+        listing=ET.Element("{"+P+"}sldIdLst")
+        masterlist=presentation.find("{"+P+"}sldMasterIdLst")
+        presentation.insert(list(presentation).index(masterlist)+1 if masterlist is not None else 0,listing)
+    ET.SubElement(listing,"{"+P+"}sldId",{"id":str(ids["slide_id"]),"{"+R+"}id":"rId"+str(ids["rel_id"])})
+    parts["ppt/presentation.xml"]=serialise_like(presentation,raw)
     rels_raw = parts.get("ppt/_rels/presentation.xml.rels")
     relationship = ('<Relationship Id="rId%s" Type="http://schemas.openxmlformats.org/'
                     'officeDocument/2006/relationships/slide" Target="slides/%s"/>'
@@ -448,13 +481,15 @@ def merge(deck: Path, plan: dict, outdir: Path) -> dict:
                                                         "ppt/theme/"))]
     operations = []
     filled = 0
+    original_order=slide_order(parts)
 
     for item in plan.get("slides", []):
         target = item.get("target_slide")
         slide_part = None
         cloned = False
         if target is not None:
-            slide_part = f"ppt/slides/slide{int(target)}.xml"
+            number=int(target)
+            slide_part=original_order[number-1] if 1<=number<=len(original_order) else None
             if slide_part not in parts:
                 operations.append({"slide": item.get("id"), "status": "missing_target",
                                    "detail": f"{slide_part} not in the deck"})
@@ -473,8 +508,11 @@ def merge(deck: Path, plan: dict, outdir: Path) -> dict:
                 if layout_name and root is not None and root.get("type") == layout_name:
                     layout_part = name
                     break
+            if layout_part is None and layout_name:
+                operations.append({"slide":item.get("id"),"status":"layout_not_found","requested_layout":layout_name})
+                continue
             if layout_part is None:
-                # fall back to the layout of the last slide so the theme still governs the new one
+                # No layout requested: explicitly record inheritance from the last existing page so the theme still governs the new one
                 for name in reversed(names):
                     if SLIDE_RE.match(name):
                         rels = rels_of(parts, name)
@@ -494,11 +532,9 @@ def merge(deck: Path, plan: dict, outdir: Path) -> dict:
                         source_slide = name
                         break
             if source_slide is None:
-                source_slide = next((n for n in names if SLIDE_RE.match(n)), None)
-            if source_slide is None:
-                operations.append({"slide": item.get("id"), "status": "no_slide_to_clone"})
-                continue
-            slide_part = clone_slide(parts, names, source_slide, layout_part)
+                slide_part=instantiate_layout(parts,names,layout_part)
+            else:
+                slide_part=clone_slide(parts,names,source_slide,layout_part)
             add_slide_to_presentation(parts, slide_part)
             cloned = True
 
@@ -566,6 +602,7 @@ def merge(deck: Path, plan: dict, outdir: Path) -> dict:
 # --------------------------------------------------------------------------- checking
 
 def check(deck: Path, output: Path, plan: dict, outdir: Path) -> dict:
+    Path(outdir).mkdir(parents=True, exist_ok=True)
     checks = []
 
     def add(check_id, requirement, ok, evidence, locator):
@@ -599,6 +636,39 @@ def check(deck: Path, output: Path, plan: dict, outdir: Path) -> dict:
 
     before_parts, _ = read_parts(deck)
     after_parts, _ = read_parts(output)
+    original_order = slide_order(before_parts)
+    final_order = slide_order(after_parts)
+    edited = set()
+    invalid_targets = []
+    additions = 0
+    for item in plan.get('slides', []):
+        target = item.get('target_slide')
+        if target is None:
+            additions += 1
+        elif type(target) is int and 1 <= target <= len(original_order):
+            edited.add(original_order[target - 1])
+        else:
+            invalid_targets.append(target)
+    add('edit_targets_valid', 'edit targets resolve to original visible pages',
+        not invalid_targets, str(invalid_targets), str(output))
+    unchanged_parts = []
+    scope_drift = []
+    for part in original_order:
+        if part in edited:
+            continue
+        folder, filename = part.rsplit('/', 1)
+        for name in (part, folder + '/_rels/' + filename + '.rels'):
+            if before_parts.get(name) != after_parts.get(name):
+                scope_drift.append(name)
+            else:
+                unchanged_parts.append(name)
+    add('untouched_slide_parts', 'unrequested source pages and their relationships remain byte-identical',
+        not scope_drift, f'unchanged={len(unchanged_parts)} drifted={scope_drift}', str(output))
+    add('original_slide_order', 'original pages retain visible order before appended pages',
+        final_order[:len(original_order)] == original_order, str(final_order), str(output))
+    add('requested_slide_count', 'only the requested number of pages is appended',
+        len(final_order) == len(original_order) + additions,
+        f'expected={len(original_order)+additions} actual={len(final_order)}', str(output))
     template_prefixes = ("ppt/slideMasters/", "ppt/slideLayouts/", "ppt/theme/")
     unchanged = [name for name in before_parts
                  if name.startswith(template_prefixes)
@@ -606,8 +676,8 @@ def check(deck: Path, output: Path, plan: dict, outdir: Path) -> dict:
                  and sha256_bytes(before_parts[name]) == sha256_bytes(after_parts[name])]
     drifted = [name for name in before_parts
                if name.startswith(template_prefixes)
-               and name in after_parts
-               and sha256_bytes(before_parts[name]) != sha256_bytes(after_parts[name])]
+               and (name not in after_parts
+                    or sha256_bytes(before_parts[name]) != sha256_bytes(after_parts[name]))]
     add("template_bytes_kept", "every master/layout/theme part is byte-identical",
         not drifted, f"unchanged={len(unchanged)} drifted={drifted}", str(output))
 
@@ -616,6 +686,37 @@ def check(deck: Path, output: Path, plan: dict, outdir: Path) -> dict:
                         if not slide["layout"] or slide["layout"] not in after_parts]
     add("placeholder_inheritance", "every slide resolves to a layout present in the package",
         not dangling_layouts, f"dangling={dangling_layouts}", str(output))
+
+    # Verify the requested page and layout, not merely that content occurs somewhere.
+    original_order=slide_order(before_parts); actual_order=slide_order(after_parts)
+    added_index=len(original_order); target_errors=[]; layout_errors=[]
+    for item in plan.get("slides",[]):
+        target=item.get("target_slide")
+        if target is not None:
+            n=int(target); part=original_order[n-1] if 1<=n<=len(original_order) else None
+        else:
+            part=actual_order[added_index] if added_index<len(actual_order) else None
+            added_index+=1
+        tree=root_of(after_parts,part) if part else None
+        if tree is None:
+            target_errors.append({"id":item.get("id"),"reason":"missing intended slide"});continue
+        text="\n".join(n.text or "" for n in tree.iter("{"+A+"}t"))
+        for field in ("title","subtitle","body","notes","caption"):
+            spec=item.get(field)
+            if spec is None:continue
+            lines=spec if isinstance(spec,list) else (spec.get("lines") or [spec.get("text") or ""])
+            for line in lines:
+                expected=line if isinstance(line,str) else (line.get("text") or "")
+                if expected and expected not in text:target_errors.append({"id":item.get("id"),"part":part,"field":field})
+        if target is None and item.get("layout"):
+            rels=rels_of(after_parts,part)
+            layout=next((r["resolved"] for r in rels.values() if (r["type"] or "").endswith("/slideLayout")),None)
+            lr=root_of(after_parts,layout) if layout else None
+            cs=lr.find("{"+P+"}cSld") if lr is not None else None
+            matches=lr is not None and (lr.get("type")==item["layout"] or (cs is not None and cs.get("name")==item["layout"]))
+            if not matches:layout_errors.append({"id":item.get("id"),"requested":item["layout"],"actual":layout})
+    add("intended_slide_content","declared content occurs on its intended presentation page",not target_errors,str(target_errors),str(output))
+    add("requested_layout","new slides inherit the requested actual layout",not layout_errors,str(layout_errors),str(output))
 
     # declared content must be present, and overflow must be reported per frame
     declared = []

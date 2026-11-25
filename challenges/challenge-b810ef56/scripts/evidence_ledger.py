@@ -1,29 +1,4 @@
-"""Dependency-free claim/evidence ledger and citation audit for source-grounded writing.
-
-The task asks for four things, and this module implements each one mechanically:
-
-    找得到  every substantive claim is extracted and tied to a specific passage of a specific
-            source, not to "having a citation"
-    对得上  the source passage is checked against the claim, including whether the original is
-            weaker or stronger than the sentence that cites it
-    说得准  the evidence strength and its uncertainty are expressed, association is not written
-            as causation, a single small study is not written as consensus, and conflicting
-            evidence is not hidden
-    复得现  the claim list, the evidence table, the verbatim extracts and the reasons are files
-            someone else can re-check and re-run
-
-Commands
---------
-extract  --doc DOC --sources DIR      claim units with locators + candidate evidence
-check    --ledger FILE                per-claim verdict: supported / weaker / stronger / none
-audit    --doc DOC --sources DIR      citation-vs-reference-list and metadata consistency
-suggest  --ledger FILE                narrowing rewrites for claims the evidence cannot carry
-report   --ledger FILE --out DIR      the reproducible ledger + evidence table + reasons
-
-Everything is rule-based and deterministic: the same input produces the same ledger, which is
-what makes it re-runnable. Verdicts are evidence-strength judgements against the supplied
-sources only; they never claim that a source is globally correct.
-"""
+"""Candidate passage retrieval and mechanical citation audit. Lexical rules do not prove source identity, entailment or scientific truth."""
 
 from __future__ import annotations
 
@@ -102,6 +77,10 @@ def sha(text: str) -> str:
 
 def read_docx_text(path: Path) -> list:
     """Paragraph list with 1-based indices, plus package facts."""
+    if path.suffix.lower() in {".md",".markdown",".txt",".rst"}:
+        text=path.read_text(encoding="utf-8")
+        paragraphs=[{"index":i,"text":line.strip(),"style_id":""} for i,line in enumerate(text.splitlines(),1) if line.strip()]
+        return paragraphs,{"parts":[],"package_sha256":hashlib.sha256(path.read_bytes()).hexdigest()}
     import zipfile
     with zipfile.ZipFile(path) as package:
         names = package.namelist()
@@ -256,6 +235,19 @@ def overlapping(passage: str, claim: str) -> float:
     return len(claim_words & passage_words) / len(claim_words)
 
 
+def citation_numbers(text):
+    numbers=set()
+    for match in re.finditer(r"\[([0-9,\s\-–]+)\]",text):
+        for token in match.group(1).split(","):
+            parts=re.split(r"[-–]",token.strip())
+            if len(parts)==1 and parts[0].isdigit(): numbers.add(int(parts[0]))
+            elif len(parts)==2 and all(x.strip().isdigit() for x in parts):
+                a,b=map(int,parts)
+                if b<a or b-a>1000: raise ValueError("invalid citation range")
+                numbers.update(range(a,b+1))
+    return sorted(numbers)
+
+
 def extract_claims(paragraphs: list) -> list:
     claims = []
     for paragraph in paragraphs:
@@ -299,9 +291,7 @@ def extract_claims(paragraphs: list) -> list:
                 "text": sentence,
                 "flags": flags,
                 "citations": [c if isinstance(c, str) else c[0] for c in citations],
-                "citation_numbers": sorted({int(n) for match in BRACKET_NUM.finditer(sentence)
-                                            for part in re.split(r"[,\-–]", match.group(1))
-                                            if part.strip().isdigit() for n in [int(part)]}),
+                "citation_numbers": citation_numbers(sentence),
                 "keywords": sorted(keywords(sentence)),
             })
     return claims
@@ -319,7 +309,8 @@ def best_evidence(claim: dict, sources: list, threshold: float = 0.5) -> list:
                     "passage_id": passage["id"],
                     "score": round(score, 3),
                     "excerpt": passage["text"][:600],
-                    "excerpt_sha256_16": sha(passage["text"].strip())[:16],
+                    "excerpt_sha256_16": sha(passage["text"][:600])[:16],
+                    "full_passage_sha256_16": sha(passage["text"])[:16],
                 })
     scored.sort(key=lambda item: (-item["score"], item["source"], item["passage_id"]))
     return scored[:5]
@@ -340,7 +331,7 @@ def judge(claim: dict, evidence: list) -> dict:
     passage = best["excerpt"]
     reasons = [f"best passage {best['source']}#{best['passage_id']} shares "
                f"{score:.0%} of the claim's content words"]
-    verdict = "supported"
+    verdict = "requires_semantic_review"
 
     passage_flags = set()
     if positive_causal(passage):
@@ -356,10 +347,10 @@ def judge(claim: dict, evidence: list) -> dict:
     if LIMIT_WORD.search(passage) or NEGATED_CAUSAL.search(passage):
         passage_flags.add("limitation")
 
-    if "causal" in flags and "causal" not in passage_flags and "statistic" not in passage_flags:
+    if "causal" in flags and "causal" not in passage_flags:
         verdict = "claim_stronger_than_source"
         reasons.append("the sentence asserts causation; the passage has neither causal wording "
-                       "nor a design/statistic that would license it")
+                       "and a statistic alone does not license causation")
     elif "consensus_claim" in flags and "small_scale" in passage_flags:
         verdict = "claim_stronger_than_source"
         reasons.append("the sentence states a general/consensus result; the passage describes a "
@@ -375,9 +366,8 @@ def judge(claim: dict, evidence: list) -> dict:
         verdict = "weakly_linked"
         reasons.append("content-word overlap is below 50%, so the link needs a human check")
     elif "hedged" in flags and not passage_flags:
-        verdict = "source_stronger_than_claim"
-        reasons.append("the passage states the result more directly than the sentence does; the "
-                       "sentence may be understating it")
+        verdict = "requires_semantic_review"
+        reasons.append("Different hedging is a review cue, not evidence to strengthen the claim.")
 
     if LIMIT_WORD.search(passage) and "limitation" not in flags:
         reasons.append("the passage itself names a limitation or conflict that the sentence "
@@ -401,7 +391,7 @@ def narrow_suggestion(claim: dict, judgement: dict) -> str:
     text = claim["text"]
     if judgement["verdict"] == "no_supplied_evidence":
         return ("Cite the source that actually contains this result, or delete the sentence; no "
-                "supplied passage supports it.")
+                "candidate passage was retrieved; inspect the source manually before deciding absence.")
     if judgement["verdict"] == "claim_stronger_than_source":
         softened = text
         replacements = [
@@ -429,19 +419,31 @@ def narrow_suggestion(claim: dict, judgement: dict) -> str:
                 "or quote it; the current link is only word overlap.")
     if judgement["verdict"] == "source_stronger_than_claim":
         return "The source is more definite than the sentence; either cite it directly or keep "
-    return "No change needed for strength; keep the locator next to the sentence."
+    return "Inspect the full cited source and decide entailment, direction, population and conditions. Lexical overlap does not establish support."
 
 
-def build_ledger(doc: Path, sources_dir: Path) -> dict:
+def build_ledger(doc: Path, sources_dir: Path, citation_map: dict | None = None) -> dict:
     paragraphs, meta = read_docx_text(doc)
     references = split_reference_list(paragraphs)
-    claims = extract_claims(paragraphs)
+    claims = extract_claims([p for p in paragraphs if references.get("start_paragraph") is None or p["index"] < references["start_paragraph"]])
     sources = collect_sources(sources_dir)
+    citation_map=citation_map or {}
     for claim in claims:
-        evidence = best_evidence(claim, sources)
+        bound_paths=[]
+        for number in claim["citation_numbers"]:
+            value=citation_map.get(str(number),[])
+            if isinstance(value,str): value=[value]
+            bound_paths.extend(str((sources_dir/name).resolve()) for name in value)
+        bound=[source for source in sources if str(Path(source["path"]).resolve()) in bound_paths]
+        # Without an explicit verified citation/source map, retrieval is only a candidate.
+        evidence = best_evidence(claim, bound if bound else sources)
+        claim["source_identity_verified"]=bool(bound) and all(any(str(Path(source["path"]).resolve())==str((sources_dir/name).resolve()) for source in sources for name in ([citation_map[str(n)]] if isinstance(citation_map.get(str(n)),str) else citation_map.get(str(n),[]))) for n in claim["citation_numbers"])
+        claim["retrieval_scope"]="explicit_cited_source_map" if bound else "unbound_candidate_only"
         judgement = judge(claim, evidence)
         judgement["suggestion"] = narrow_suggestion(claim, judgement)
         claim["evidence"] = evidence
+        judgement["semantic_support_verified"]=False
+        judgement["reasons"].append("Lexical rules only; agent must inspect source entailment and verify cited-source identity.")
         claim["judgement"] = judgement
         cited = [e for e in references.get("entries", []) if e["number"] in claim["citation_numbers"]]
         claim["cited_references"] = [
@@ -629,7 +631,7 @@ def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description="Claim/evidence ledger and citation audit")
     sub = parser.add_subparsers(dest="command", required=True)
     p = sub.add_parser("extract"); p.add_argument("--doc", required=True)
-    p.add_argument("--sources", required=True); p.add_argument("--out", required=True)
+    p.add_argument("--sources", required=True); p.add_argument("--out", required=True); p.add_argument("--citation-map")
     p = sub.add_parser("audit"); p.add_argument("--ledger", required=True); p.add_argument("--out", required=True)
     p = sub.add_parser("report"); p.add_argument("--ledger", required=True); p.add_argument("--out", required=True)
     p = sub.add_parser("verify"); p.add_argument("--ledger", required=True); p.add_argument("--sources", required=True)
@@ -637,7 +639,7 @@ def main(argv=None) -> int:
 
     args = parser.parse_args(argv)
     if args.command == "extract":
-        ledger = build_ledger(Path(args.doc), Path(args.sources))
+        ledger = build_ledger(Path(args.doc), Path(args.sources),json.loads(Path(args.citation_map).read_text(encoding="utf-8")) if args.citation_map else None)
         Path(args.out).write_text(json.dumps(ledger, ensure_ascii=False, indent=2), encoding="utf-8")
         print(json.dumps({"claims": ledger["claim_count"], "sources": len(ledger["sources"]),
                           "references": ledger["references"].get("entry_count", 0),

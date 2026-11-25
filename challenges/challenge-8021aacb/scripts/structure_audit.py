@@ -101,6 +101,25 @@ def q(tag: str) -> str:
 
 
 def read_parts(path: Path):
+    """Open an OOXML package and return its parts.
+
+    The engine predates the runtime contract, which hands the case a PDF or Markdown document as often
+    as a DOCX. Opening a non-zip path as a package raised a bare BadZipFile from deep inside zipfile,
+    which tells the agent nothing it can act on. Detect the case, explain it, and point at the tool that
+    does handle it.
+    """
+    if not path.exists():
+        raise SystemExit(f"no such document: {path}")
+    if not zipfile.is_zipfile(path):
+        suffix = path.suffix.lower() or "(no suffix)"
+        raise SystemExit(
+            f"{path.name} is not an OOXML package ({suffix}).\n"
+            "structure_audit reads .docx only: it inspects the package parts, not rendered text.\n"
+            "For PDF or Markdown input:\n"
+            "  - extract text first with the declared pdf-text-tool / ocr-tool, then run the audit on\n"
+            "    the converted .docx, or\n"
+            "  - use chapter_consistency.py audit --chapters ... , which reads plain text directly."
+        )
     with zipfile.ZipFile(path) as package:
         names = package.namelist()
         return {name: package.read(name) for name in names}, names
@@ -472,7 +491,7 @@ def diagnose(doc: dict, outline: dict, claims: dict) -> dict:
     for unit in units:
         if unit["kind"] != "paragraph" or not unit["text"] or unit.get("heading_level"):
             continue
-        key = re.sub(r"\W+", "", unit["text"].lower())
+        key = unit["text"]
         if len(key) < 40:
             continue
         if key in seen_text:
@@ -577,7 +596,33 @@ def apply_plan(doc_path: Path, plan_path: Path, outdir: Path) -> dict:
         (outdir / "apply-report.json").write_text(json.dumps(report, ensure_ascii=False, indent=2),
                                                   encoding="utf-8")
         return report
+    def refuse(reason):
+        report = {"applied": False, "reason": reason}
+        (outdir / "apply-report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        return report
+    actual_hash = __import__("hashlib").sha256(doc_path.read_bytes()).hexdigest()
+    if plan.get("document", {}).get("sha256") != actual_hash:
+        return refuse("Plan source hash differs from this document; regenerate the plan.")
     elements = list(body)
+    deletes = [action for action in plan.get("actions", []) if action.get("mode") == "delete"]
+    indices = [action.get("paragraph_index") for action in deletes]
+    if any(type(i) is not int or not 1 <= i <= len(elements) for i in indices):
+        return refuse("Invalid deletion index.")
+    if len(set(indices)) != len(indices):
+        return refuse("Duplicate deletion indices.")
+    for action, index in zip(deletes, indices):
+        element = elements[index - 1]
+        if action.get("operation") != "delete_paragraph" or element.tag != q("p"):
+            return refuse("Only duplicate paragraph deletions are supported.")
+        # Do not delete fields, anchors, notes, drawings, equations, breaks or revisions.
+        allowed = {q(x) for x in ("p", "pPr", "r", "rPr", "t", "pStyle", "jc", "spacing",
+                                  "ind", "b", "i", "u", "sz", "szCs", "rFonts", "color", "lang")}
+        if any(node.tag not in allowed for node in element.iter()):
+            return refuse("Paragraph contains non-text structure; manual review required.")
+        text = para_text(element)
+        if not text.strip() or not any(j not in indices and other.tag == q("p")
+                and para_text(other) == text for j, other in enumerate(elements, 1)):
+            return refuse("Deletion has no exact-text duplicate surviving in the document.")
     before_units = [(u["index"], text_sha(u["text"])) for u in
                     (build_units(doc_path).get("units") or [])]
     removed = []
@@ -725,7 +770,15 @@ def verify_edit(doc_path: Path, out_path: Path, outdir: Path) -> dict:
 
 
 def write_json(path: Path, payload) -> None:
-    Path(path).write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    """Write the report, creating its parent directory first.
+
+    The audit is the expensive part; failing at the last step because `--out work/claims.json` names a
+    directory that does not exist throws that work away for no reason.
+    """
+    target = Path(path)
+    if target.parent and not target.parent.exists():
+        target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 def main(argv=None) -> int:

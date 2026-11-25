@@ -50,7 +50,12 @@ def load_json(path: Path):
 
 
 def discover_fields(case: dict, fields_path: Path | None) -> list:
-    """The requested fields, from an explicit file or from the case contract itself."""
+    """The requested fields, from an explicit file or from the case contract itself.
+
+    The runtime contract says `result.json` must carry "every original `output_contract` field", so the
+    field set very often lives under `output_contract` rather than at the case root. Look in both, and
+    accept a list or a mapping either way.
+    """
     if fields_path:
         payload = load_json(fields_path)
         if isinstance(payload, list):
@@ -59,13 +64,21 @@ def discover_fields(case: dict, fields_path: Path | None) -> list:
             if isinstance(payload.get(key), list):
                 return payload[key]
         raise SystemExit(f"{fields_path} does not declare a field list")
-    for key in ("target_fields", "fields", "requested_fields"):
-        value = case.get(key)
-        if isinstance(value, list):
-            return value
+
+    containers = [case]
+    for nested in ("output_contract", "contract", "output"):
+        value = case.get(nested)
         if isinstance(value, dict):
-            return [{"field_id": k, **v} if isinstance(v, dict) else {"field_id": k, "description": v}
-                    for k, v in value.items()]
+            containers.append(value)
+
+    for container in containers:
+        for key in ("target_fields", "fields", "requested_fields"):
+            value = container.get(key)
+            if isinstance(value, list):
+                return value
+            if isinstance(value, dict):
+                return [{"field_id": k, **v} if isinstance(v, dict) else {"field_id": k, "description": v}
+                        for k, v in value.items()]
     return []
 
 
@@ -203,9 +216,11 @@ def check(answer: dict, case: dict, fields: list, questions: list, outdir: Path)
         quote = entry.get("quote")
         if not quote or entry.get("status") != "reported":
             continue
-        if sources and normalise(quote) not in all_text:
+        locator = str(entry.get("paragraph_id") or entry.get("locator") or "")
+        source = sources.get(locator)
+        if source is None or normalise(quote) not in normalise(source):
             unverifiable.append(identifier)
-    add("quotes_are_verbatim", "every quotation actually appears in the supplied material",
+    add("quotes_are_verbatim", "every quotation appears within its declared source locator",
         not unverifiable, f"quotes not found in the material={unverifiable[:8]}")
 
     conflicts_without_both = [identifier for identifier, entry in by_id.items()

@@ -602,6 +602,7 @@ def merge(deck: Path, plan: dict, outdir: Path) -> dict:
 # --------------------------------------------------------------------------- checking
 
 def check(deck: Path, output: Path, plan: dict, outdir: Path) -> dict:
+    Path(outdir).mkdir(parents=True, exist_ok=True)
     checks = []
 
     def add(check_id, requirement, ok, evidence, locator):
@@ -635,6 +636,39 @@ def check(deck: Path, output: Path, plan: dict, outdir: Path) -> dict:
 
     before_parts, _ = read_parts(deck)
     after_parts, _ = read_parts(output)
+    original_order = slide_order(before_parts)
+    final_order = slide_order(after_parts)
+    edited = set()
+    invalid_targets = []
+    additions = 0
+    for item in plan.get('slides', []):
+        target = item.get('target_slide')
+        if target is None:
+            additions += 1
+        elif type(target) is int and 1 <= target <= len(original_order):
+            edited.add(original_order[target - 1])
+        else:
+            invalid_targets.append(target)
+    add('edit_targets_valid', 'edit targets resolve to original visible pages',
+        not invalid_targets, str(invalid_targets), str(output))
+    unchanged_parts = []
+    scope_drift = []
+    for part in original_order:
+        if part in edited:
+            continue
+        folder, filename = part.rsplit('/', 1)
+        for name in (part, folder + '/_rels/' + filename + '.rels'):
+            if before_parts.get(name) != after_parts.get(name):
+                scope_drift.append(name)
+            else:
+                unchanged_parts.append(name)
+    add('untouched_slide_parts', 'unrequested source pages and their relationships remain byte-identical',
+        not scope_drift, f'unchanged={len(unchanged_parts)} drifted={scope_drift}', str(output))
+    add('original_slide_order', 'original pages retain visible order before appended pages',
+        final_order[:len(original_order)] == original_order, str(final_order), str(output))
+    add('requested_slide_count', 'only the requested number of pages is appended',
+        len(final_order) == len(original_order) + additions,
+        f'expected={len(original_order)+additions} actual={len(final_order)}', str(output))
     template_prefixes = ("ppt/slideMasters/", "ppt/slideLayouts/", "ppt/theme/")
     unchanged = [name for name in before_parts
                  if name.startswith(template_prefixes)
