@@ -35,7 +35,7 @@ script or copy it into the working notes for the task.
 - Scale bars / axis keys / compass keys:
 - Panel letters:
 - Animation labels or frame timing, if any:
-- Panel text budget (default: no visible text; list only explicitly requested text):
+- Required data labels, units, ticks, legends, and scale bars:
 - Explanations moved to caption/manifest:
 
 ## Forbidden Changes
